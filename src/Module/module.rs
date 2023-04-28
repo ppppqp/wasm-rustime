@@ -32,12 +32,31 @@ pub struct Global{
   initExpr: Vec<u8>
 }
 
+pub struct Code{
+  body: Vec<u8>,
+  localVarTypes: Vec<u8>,
+}
+
+pub struct Element{
+  tableIndex: u32,
+  initExpr: Vec<u8>,
+  funcIndices: Vec<u32>,
+}
+
+pub struct Data{
+  memoryIndex: u32,
+  initExpr: Vec<u8>,
+  data: Vec<u8>
+}
 pub struct Module{
   pub startFnIndex: u32,
   pub funcTypes: Vec<(Vec<i32>, Vec<i32>)>,
   pub imports: Vec<Import>,
   pub exports: Vec<Export>,
   pub functions: Vec<Function>,
-  pub tables: Vec<Table>
+  pub tables: Vec<Table>,
+  pub codes: Vec<Code>,
+  pub elements: Vec<Element>,
+  pub data: Vec<Data>
 }
 

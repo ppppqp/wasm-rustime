@@ -2,19 +2,36 @@
 use std::io::{Read, BufReader};
 use super::walker::{walki32, walku32, walki8, walku8};
 use super::handler::{
+  CustomHandler,
   HeaderHandler,
   TypeHandler,
   ImportHandler,
   ExportHandler,
   FunctionHandler,
+  TableHandler,
+  MemoryHandler,
+  StartHandler,
+  GlobalHandler,
+  CodeHandler,
+  ElementHandler,
+  DataHandler, 
 };
 // load a wasm file
 pub struct Loader{
+  customHandler: CustomHandler,
   headerHandler: HeaderHandler,
   typeHandler: TypeHandler,
   importHandler: ImportHandler,
   exportHandler: ExportHandler,
   functionHandler: FunctionHandler,
+  tableHandler: TableHandler,
+  memoryHandler: MemoryHandler,
+  startHandler: StartHandler,
+  globalHandler: GlobalHandler,
+  elementHandler: ElementHandler,
+  codeHandler: CodeHandler,
+  dataHandler: DataHandle,
+  dataCountHandler: DataCountHandler,
 }
 
 pub enum ValidateError{
@@ -32,7 +49,7 @@ pub trait Load{
 
 
 impl Load for Loader{
-  fn validate<R:Read>(&self, data:R)->Result<(), ValidateError> {
+  pub fn validate<R:Read>(&self, data:R)->Result<(), ValidateError> {
     let mut reader = BufReader::new(data);
 
     let mut res = walku32(&mut reader);
@@ -54,10 +71,26 @@ impl Load for Loader{
   }
 
 
-  fn parse<R:Read>(&self, data:R){
+  fn parse<R:Read>(&self, data:R, module: Module){
     let mut reader = BufReader::new(data);
-    
-
+    while BufReader.buffer().len() > 0 {
+      let sectionId = walk::<u8>(reader)?;
+      match sectionId {
+        0=>{ self.customHandler.handle(buf_reader, module);}
+        1=>{ self.typeHandler.handle(buf_reader, module); }
+        2=>{ self.importHandler.handle(buf_reader, module); }
+        3=>{ self.functionHandler.handle(buf_reader, module); }
+        4=>{ self.tableHandler.handle(buf_reader, module); }
+        5=>{ self.memoryHandler.handle(buf_reader, module); }
+        6=>{ self.globalHandler.handle(buf_reader, module); }
+        7=>{ self.exportHandler.handle(buf_reader, module); }
+        8=>{ self.startHandler.handle(buf_reader, module); }
+        9=>{ self.elementHandler.handle(buf_reader, module); }
+        10=>{ self.codeHandler.handle(buf_reader, module); }
+        11=>{ self.dataHandler.handle(buf_reader, module); }
+        12=>{ todo!(); }
+      }
+    }
   }
 }
 
