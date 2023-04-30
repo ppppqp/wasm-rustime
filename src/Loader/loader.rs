@@ -1,7 +1,8 @@
 
-use std::io::{Read, BufReader};
-use super::walker::{walki32, walku32, walki8, walku8};
+use std::io::{Read, BufReader, Seek};
+use super::walker::{walk};
 use super::handler::{
+  Handler,
   CustomHandler,
   HeaderHandler,
   TypeHandler,
@@ -16,7 +17,9 @@ use super::handler::{
   ElementHandler,
   DataHandler, 
 };
+use crate::Module::module::*;
 // load a wasm file
+#[derive(Default)]
 pub struct Loader{
   customHandler: CustomHandler,
   headerHandler: HeaderHandler,
@@ -30,10 +33,10 @@ pub struct Loader{
   globalHandler: GlobalHandler,
   elementHandler: ElementHandler,
   codeHandler: CodeHandler,
-  dataHandler: DataHandle,
-  dataCountHandler: DataCountHandler,
+  dataHandler: DataHandler,
 }
 
+#[derive(Debug)]
 pub enum ValidateError{
   ErrorReadingBytes(std::io::Error),
   ErrorMagicBytes,
@@ -42,17 +45,17 @@ pub enum ValidateError{
 
 pub trait Load{
   fn validate<R:Read>(&self, data:R)->Result<(), ValidateError>;
-  fn parse<R:Read>(&self, data:R);
+  fn parse<R:Read>(&self, data:R, module: &mut Module) where R: Read + Seek;
 }
 
 
 
 
 impl Load for Loader{
-  pub fn validate<R:Read>(&self, data:R)->Result<(), ValidateError> {
+  fn validate<R:Read>(&self, data:R)->Result<(), ValidateError> {
     let mut reader = BufReader::new(data);
 
-    let mut res = walku32(&mut reader);
+    let mut res = walk::<u32, R>(&mut reader);
     if let Err(err) = res{
       return Err(ValidateError::ErrorReadingBytes(err));
     }
@@ -60,7 +63,7 @@ impl Load for Loader{
       return Err(ValidateError::ErrorMagicBytes);
     }
 
-    res = walku32(&mut reader);
+    res = walk::<u32, R>(&mut reader);
     if let Err(err) = res{
       return Err(ValidateError::ErrorReadingBytes(err));
     }
@@ -71,24 +74,25 @@ impl Load for Loader{
   }
 
 
-  fn parse<R:Read>(&self, data:R, module: Module){
-    let mut reader = BufReader::new(data);
-    while BufReader.buffer().len() > 0 {
-      let sectionId = walk::<u8>(reader)?;
+  fn parse<R>(&self, data:R, module: &mut Module) where R: Read + Seek{
+    let mut buf_reader = BufReader::new(data);
+    while buf_reader.buffer().len() > 0 {
+      let sectionId = walk::<u8, R>(&mut buf_reader).unwrap();
       match sectionId {
-        0=>{ self.customHandler.handle(buf_reader, module);}
-        1=>{ self.typeHandler.handle(buf_reader, module); }
-        2=>{ self.importHandler.handle(buf_reader, module); }
-        3=>{ self.functionHandler.handle(buf_reader, module); }
-        4=>{ self.tableHandler.handle(buf_reader, module); }
-        5=>{ self.memoryHandler.handle(buf_reader, module); }
-        6=>{ self.globalHandler.handle(buf_reader, module); }
-        7=>{ self.exportHandler.handle(buf_reader, module); }
-        8=>{ self.startHandler.handle(buf_reader, module); }
-        9=>{ self.elementHandler.handle(buf_reader, module); }
-        10=>{ self.codeHandler.handle(buf_reader, module); }
-        11=>{ self.dataHandler.handle(buf_reader, module); }
+        0=>{ self.customHandler.handle(&mut buf_reader, module);}
+        1=>{ self.typeHandler.handle(&mut buf_reader,module); }
+        2=>{ self.importHandler.handle(&mut buf_reader, module); }
+        3=>{ self.functionHandler.handle(&mut buf_reader, module); }
+        4=>{ self.tableHandler.handle(&mut buf_reader, module); }
+        5=>{ self.memoryHandler.handle(&mut buf_reader, module); }
+        6=>{ self.globalHandler.handle(&mut buf_reader, module); }
+        7=>{ self.exportHandler.handle(&mut buf_reader, module); }
+        8=>{ self.startHandler.handle(&mut buf_reader, module); }
+        9=>{ self.elementHandler.handle(&mut buf_reader, module); }
+        10=>{ self.codeHandler.handle(&mut buf_reader, module); }
+        11=>{ self.dataHandler.handle(&mut buf_reader, module); }
         12=>{ todo!(); }
+        _ => { todo!();}
       }
     }
   }

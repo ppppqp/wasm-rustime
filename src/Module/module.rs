@@ -1,61 +1,63 @@
 pub struct Import{
-  module: String,
-  field: String,
-  description: u8
+  pub module: String,
+  pub field: String,
+  pub description: u8
 }
 
 pub struct Function{
-  index: u32
+  pub index: u32
 }
 pub struct Export{
-  field: String,
-  description: u8,
-  index: u32,
+  pub field: String,
+  pub description: u8,
+  pub index: u32,
 }
 
 pub struct Table{
-  elementType: u8,
-  limitFlag: u8,
-  limitInitial: u32,
-  limitMax: u32,
+  pub elementType: u8,
+  pub limitFlag: u8,
+  pub limitInitial: u32,
+  pub limitMax: u32,
 }
 
 pub struct Memory{
-  limitFlag: u8,
-  limitInitial: u32,
-  limitMax: u32,
+  pub limitFlag: u8,
+  pub limitInitial: u32,
+  pub limitMax: u32,
 }
 
 pub struct Global{
-  limitFlag: u8,
-  limitInitial: u32,
-  initExpr: Vec<u8>
+  pub valueType: u8,
+  pub mutable: u8,
+  pub initExpr: Vec<u8>
 }
 
 pub struct Code{
-  body: Vec<u8>,
-  localVarTypes: Vec<u8>,
+  pub body: Vec<u8>,
+  pub localVarTypes: Vec<u8>,
 }
 
 pub struct Element{
-  tableIndex: u32,
-  initExpr: Vec<u8>,
-  funcIndices: Vec<u32>,
+  pub tableIndex: u32,
+  pub initExpr: Vec<u8>,
+  pub funcIndices: Vec<u32>,
 }
 
 pub struct Data{
-  memoryIndex: u32,
-  initExpr: Vec<u8>,
-  data: Vec<u8>
+  pub memoryIndex: u32,
+  pub initExpr: Vec<u8>,
+  pub data: Vec<u8>
 }
 pub struct Module{
   pub startFnIndex: u32,
-  pub funcTypes: Vec<(Vec<i32>, Vec<i32>)>,
+  pub funcTypes: Vec<(Vec<u32>, Vec<u32>)>,
   pub imports: Vec<Import>,
   pub exports: Vec<Export>,
   pub functions: Vec<Function>,
   pub tables: Vec<Table>,
+  pub memories: Vec<Memory>,
   pub codes: Vec<Code>,
+  pub globals: Vec<Global>,
   pub elements: Vec<Element>,
   pub data: Vec<Data>
 }

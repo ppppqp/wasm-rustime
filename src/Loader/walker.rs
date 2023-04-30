@@ -4,9 +4,11 @@ use std::io::Read;
 use std::mem;
 use std::u8;
 
-trait Walkable{
+pub trait Walkable{
   fn walk<R>(buf_reader: &mut BufReader<R>) ->Result<Self, std::io::Error> where R: std::io::Read, Self: Sized;
 }
+trait SizedWalkable: Walkable + Sized {}
+
 
 impl Walkable for i32{
   fn walk<R>(buf_reader: &mut BufReader<R>)->Result<i32, std::io::Error> where R: std::io::Read{
@@ -53,47 +55,28 @@ pub fn walkWithSize<T, R>(buf_reader: &mut BufReader<R>, size: usize) -> Result<
 }
 
 
+pub fn walk<T,R>(buf_reader: &mut BufReader<R>)-> Result<T, std::io::Error> where R: std::io::Read, T:Walkable {
+  return T::walk::<R>(buf_reader);
+}
 
-// pub fn walk<T,R>(buf_reader: &mut BufReader<R>)->Result<T, std::io::Error> where R: std::io::Read, T:Sized {
-//   match std::any::type_name::<T>(){
-//     "u32" => {
-//       return Ok(walku32::<R>(buf_reader));
-//     }
-//     "i32" => {
-//       return Ok(walki32::<R>(buf_reader)?);
-//     }
-//     "u8" => {
-//       return Ok(walku8::<R>(buf_reader)?);
-//     }
-//     "i8" => {
-//       return Ok(walki8::<R>(buf_reader)?);
-//     }
-//   }
-// }
-
-pub fn walkWithDelimiter<T, R>(buf_reader: &mut BufReader<R>, delim: T)->Result<Vec<T>, std::io::Error> where R: std::io::Read{
-  let res: Vec<T> = vec![];
-  let mut current = walk<T>(buf_reader)?;
+pub fn walkWithDelimiter<T, R>(buf_reader: &mut BufReader<R>, delim: T)->Result<Vec<T>, std::io::Error> where R: std::io::Read, T: Walkable + PartialEq + Copy{
+  let mut res: Vec<T> = vec![];
+  let mut current = T::walk(buf_reader)?;
   res.push(current);
   while current != delim {
-    current = walk<T>(buf_reader)?;
+    current = T::walk(buf_reader)?;
     res.push(current);
   }
   Ok(res)
 }
 
-pub fn walkWithSize<T, R>(buf_reader: &mut BufReader<R>, size: usize) -> Result<Vec<T>, std::io::Error> where R: std::io::Read{
-  let res: Vec<T> = vec![];
-  for _i in [0..size]{
-    res.push(walk<T>(buf_reader)?);
-  }
-  Ok(res)
-}
+
 
 pub fn walkStr<R>(buf_reader: &mut BufReader<R>, len: usize) -> Result<String, std::io::Error> where R: std::io::Read{
   let mut buffer = vec![0; len];
-  buf_reader.take(len as u64).read_exact(&mut buf)?;
-  Ok(String::from_utf8(buffer)?)
+  buf_reader.take(len as u64).read_exact(&mut buffer)?;
+  Ok(String::from_utf8(buffer).unwrap())
+  // FIXME: Error handling
 }
 #[cfg(test)]
 mod tests {
@@ -103,28 +86,28 @@ mod tests {
   fn test_walk_i8(){
     let data = vec![0xf9];
     let mut reader = BufReader::new(data.as_slice());
-    let result = walki8(&mut reader);
+    let result = i8::walk(&mut reader);
     assert_eq!(result.unwrap(), -7);
   }
 
   fn test_walk_u8(){
     let data = vec![0xf9];
     let mut reader = BufReader::new(data.as_slice());
-    let result = walku8(&mut reader);
+    let result = u8::walk(&mut reader);
     assert_eq!(result.unwrap(), 249 as u8);
   }
 
   fn test_walk_i32(){
     let data = vec![0xf9; 4];
     let mut reader = BufReader::new(data.as_slice());
-    let result = walki32(&mut reader);
+    let result = i32::walk(&mut reader);
     assert_eq!(result.unwrap(), -101058055);
   }
 
   fn test_walk_u32(){
     let data = vec![0xf9; 4];
     let mut reader = BufReader::new(data.as_slice());
-    let result = walku32(&mut reader);
+    let result = u32::walk(&mut reader);
     assert_eq!(result.unwrap(), 4193909241 as u32);
   }
 
