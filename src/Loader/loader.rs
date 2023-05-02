@@ -3,6 +3,7 @@ use std::io::{Read, BufReader, Seek};
 use super::walker::{walk};
 use super::handler::{
   Handler,
+  HandlerError,
   CustomHandler,
   TypeHandler,
   ImportHandler,
@@ -50,12 +51,21 @@ pub trait Load{
 #[derive(Debug)]
 pub enum ParseError{
   ErrorValidate(ValidateError),
-  ErrorReadingBytes(std::io::Error)
+  ErrorReadingBytes(std::io::Error),
+  ErrorHandling,
 }
 
-impl From<std::io::Error> for ParseError {
-  fn from(e: std::io::Error) -> Self {
-      ParseError::ErrorReadingBytes(e)
+impl From<HandlerError> for ParseError {
+  fn from(e: HandlerError) -> Self {
+      match e{
+        HandlerError::ErrorReadingBytes(error) => {
+          return ParseError::ErrorReadingBytes(error);
+        }
+        HandlerError::InvalidFuncType => {
+          return ParseError::ErrorHandling;
+        }
+      }
+      
   }
 }
 

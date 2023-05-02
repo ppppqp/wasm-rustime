@@ -6,7 +6,7 @@ use Module::module::*;
 use std::fs::File;
 fn main() {
     let loader: Loader::loader::Loader = Default::default();
-    let result = File::open("program.wasm");
+    let result = File::open("a.out.wasm");
     if result.is_err(){
         println!("Failed to open input file");
     }
@@ -14,5 +14,8 @@ fn main() {
     let mut module: Module::module::Module = Default::default();
     let result = loader.parse(file, &mut module);
     // let result = "hello";
+    if result.is_err() {
+        println!("Failed to parse");
+    }
     println!("{:#?}", module);
 }

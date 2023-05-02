@@ -6,8 +6,18 @@ use super::consts::*;
 use crate::instruction::OpCode;
 use crate::Module::module::Module;
 use crate::Module::module::*;
+pub enum HandlerError{
+  ErrorReadingBytes(std::io::Error),
+  InvalidFuncType,
+}
+
+impl From<std::io::Error> for HandlerError {
+  fn from(e: std::io::Error) -> Self {
+      Self::ErrorReadingBytes(e)
+  }
+}
 pub trait Handler{
-  fn handle<R>(&self, buf_reader: &mut BufReader<R>, module: &mut Module)-> Result<(), std::io::Error> where R: std::io::Read + Seek;
+  fn handle<R>(&self, buf_reader: &mut BufReader<R>, module: &mut Module)-> Result<(), HandlerError> where R: std::io::Read + Seek;
 }
 #[derive(Default)]
 pub struct HeaderHandler{}
@@ -37,18 +47,18 @@ pub struct DataHandler{}
 pub struct CustomHandler{}
 
 impl Handler for HeaderHandler{
-  fn handle<R>(&self, _buf_reader: &mut BufReader<R>, _module: &mut Module)-> Result<(), std::io::Error> where R: std::io::Read{
+  fn handle<R>(&self, _buf_reader: &mut BufReader<R>, _module: &mut Module)-> Result<(), HandlerError> where R: std::io::Read{
     Ok(())
   }
 }
 
 impl Handler for TypeHandler{
-  fn handle<R>(&self, buf_reader: &mut BufReader<R>, module: &mut Module)-> Result<(), std::io::Error> where R: std::io::Read{
+  fn handle<R>(&self, buf_reader: &mut BufReader<R>, module: &mut Module)-> Result<(), HandlerError> where R: std::io::Read{
     let _ = walk::<u32, R>(buf_reader)?;
     let entity_count = walk::<u32, R>(buf_reader)?;
     for _i in 0..entity_count{
       if walk::<u32, R>(buf_reader)? != Type::Func as u32{
-        // TODO: expection terminate
+        return Err(HandlerError::InvalidFuncType);
       }
 
       let mut func_type: (Vec<u32>, Vec<u32>) = (vec![], vec![]);
@@ -70,7 +80,7 @@ impl Handler for TypeHandler{
 }
 
 impl Handler for ImportHandler{
-  fn handle<R>(&self, buf_reader: &mut BufReader<R>, module: &mut Module)-> Result<(), std::io::Error> where R: std::io::Read {
+  fn handle<R>(&self, buf_reader: &mut BufReader<R>, module: &mut Module)-> Result<(), HandlerError> where R: std::io::Read {
       let _ = walk::<u32, R>(buf_reader)?;
       let import_entity_count = walk::<u32, R>(buf_reader)?;
       for _i in 0..import_entity_count{
@@ -87,7 +97,7 @@ impl Handler for ImportHandler{
 }
 
 impl Handler for ExportHandler{
-  fn handle<R>(&self, buf_reader: &mut BufReader<R>, module: &mut Module)-> Result<(), std::io::Error> where R: std::io::Read {
+  fn handle<R>(&self, buf_reader: &mut BufReader<R>, module: &mut Module)-> Result<(), HandlerError> where R: std::io::Read {
       let _ = walk::<u32, R>(buf_reader)?;
       let export_count = walk::<u32, R>(buf_reader)?;
       for _i in 0..export_count{
@@ -103,7 +113,7 @@ impl Handler for ExportHandler{
 }
 
 impl Handler for FunctionHandler{
-  fn handle<R>(&self, buf_reader: &mut BufReader<R>, module: &mut Module)-> Result<(), std::io::Error> where R: std::io::Read {
+  fn handle<R>(&self, buf_reader: &mut BufReader<R>, module: &mut Module)-> Result<(), HandlerError> where R: std::io::Read {
       let _ = walk::<u32, R>(buf_reader)?;
       let function_count = walk::<u32, R>(buf_reader)?;
       for _i  in 0..function_count{
@@ -116,7 +126,7 @@ impl Handler for FunctionHandler{
 }
 
 impl Handler for TableHandler{
-  fn handle<R>(&self, buf_reader: &mut BufReader<R>, module: &mut Module)-> Result<(), std::io::Error> where R: std::io::Read {
+  fn handle<R>(&self, buf_reader: &mut BufReader<R>, module: &mut Module)-> Result<(), HandlerError> where R: std::io::Read {
       let _ = walk::<u32, R>(buf_reader);
       let table_count = walk::<u32, R>(buf_reader)?;
       for _i in 0..table_count{
@@ -135,7 +145,7 @@ impl Handler for TableHandler{
 }
 
 impl Handler for MemoryHandler{
-  fn handle<R>(&self, buf_reader: &mut BufReader<R>, module: &mut Module)-> Result<(), std::io::Error> where R: std::io::Read {
+  fn handle<R>(&self, buf_reader: &mut BufReader<R>, module: &mut Module)-> Result<(), HandlerError> where R: std::io::Read {
       let _ = walk::<u32, R>(buf_reader)?;
       let memory_count = walk::<u32, R>(buf_reader)?;
       for _i in 0..memory_count{
@@ -153,7 +163,7 @@ impl Handler for MemoryHandler{
 }
 
 impl Handler for StartHandler{
-  fn handle<R>(&self, buf_reader: &mut BufReader<R>, module: &mut Module)-> Result<(), std::io::Error> where R: std::io::Read {
+  fn handle<R>(&self, buf_reader: &mut BufReader<R>, module: &mut Module)-> Result<(), HandlerError> where R: std::io::Read {
     let start_index = walk::<u32, R>(buf_reader)?;
     module.start_index = start_index;
     println!("Start section passed");
@@ -162,7 +172,7 @@ impl Handler for StartHandler{
 }
 
 impl Handler for GlobalHandler{
-  fn handle<R>(&self, buf_reader: &mut BufReader<R>, module: &mut Module)-> Result<(), std::io::Error> where R: std::io::Read {
+  fn handle<R>(&self, buf_reader: &mut BufReader<R>, module: &mut Module)-> Result<(), HandlerError> where R: std::io::Read {
       let _ = walk::<u32, R>(buf_reader)?;
       let global_count = walk::<u32, R>(buf_reader)?;
       for _i in 0..global_count{
@@ -177,7 +187,7 @@ impl Handler for GlobalHandler{
 }
 
 impl Handler for CodeHandler {
-  fn handle<R>(&self, buf_reader: &mut BufReader<R>, module: &mut Module)-> Result<(), std::io::Error> where R: std::io::Read + Seek {
+  fn handle<R>(&self, buf_reader: &mut BufReader<R>, module: &mut Module)-> Result<(), HandlerError> where R: std::io::Read + Seek {
       let _ = walk::<u32, R>(buf_reader)?;
       let func_def_count = walk::<u32, R>(buf_reader)?;
       for _i in 0..func_def_count{
@@ -201,7 +211,7 @@ impl Handler for CodeHandler {
 }
 
 impl Handler for ElementHandler{
-  fn handle<R>(&self, buf_reader: &mut BufReader<R>, module: &mut Module)-> Result<(), std::io::Error> where R: std::io::Read {
+  fn handle<R>(&self, buf_reader: &mut BufReader<R>, module: &mut Module)-> Result<(), HandlerError> where R: std::io::Read {
       let _ = walk::<u32, R>(buf_reader);
       let element_count = walk::<u32, R>(buf_reader)?;
       for _i in 0..element_count{
@@ -220,7 +230,7 @@ impl Handler for ElementHandler{
 }
 
 impl Handler for DataHandler {
-  fn handle<R>(&self, buf_reader: &mut BufReader<R>, module: &mut Module)-> Result<(), std::io::Error> where R: std::io::Read {
+  fn handle<R>(&self, buf_reader: &mut BufReader<R>, module: &mut Module)-> Result<(), HandlerError> where R: std::io::Read {
     let _ = walk::<u32, R>(buf_reader);
     let data_seg_count = walk::<u32, R>(buf_reader)?;
     for _i in 0..data_seg_count{
@@ -236,7 +246,7 @@ impl Handler for DataHandler {
 }
 
 impl Handler for CustomHandler{
-  fn handle<R>(&self, buf_reader: &mut BufReader<R>, _: &mut Module)-> Result<(), std::io::Error> where R: std::io::Read {
+  fn handle<R>(&self, buf_reader: &mut BufReader<R>, _: &mut Module)-> Result<(), HandlerError> where R: std::io::Read {
     let _ = walk::<u32, R>(buf_reader);
     let size = walk::<u32, R>(buf_reader)?;
     walk_with_size::<R>(buf_reader, size as usize)?;

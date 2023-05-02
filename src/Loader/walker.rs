@@ -75,7 +75,7 @@ impl Walkable for u8{
 
 pub fn walk_with_size<R>(buf_reader: &mut BufReader<R>, size: usize) -> Result<Vec<u8>, std::io::Error> where R: std::io::Read{
   let mut res: Vec<u8> = vec![];
-  for i in 0..size{
+  for _i in 0..size{
     res.push(u8::walk(buf_reader)?);
   }
   Ok(res)
