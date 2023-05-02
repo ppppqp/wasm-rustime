@@ -4,7 +4,6 @@ use super::walker::{walk};
 use super::handler::{
   Handler,
   CustomHandler,
-  HeaderHandler,
   TypeHandler,
   ImportHandler,
   ExportHandler,
@@ -17,23 +16,23 @@ use super::handler::{
   ElementHandler,
   DataHandler, 
 };
+use crate::Loader::walker::walk_with_size;
 use crate::Module::module::*;
 // load a wasm file
 #[derive(Default)]
 pub struct Loader{
-  customHandler: CustomHandler,
-  headerHandler: HeaderHandler,
-  typeHandler: TypeHandler,
-  importHandler: ImportHandler,
-  exportHandler: ExportHandler,
-  functionHandler: FunctionHandler,
-  tableHandler: TableHandler,
-  memoryHandler: MemoryHandler,
-  startHandler: StartHandler,
-  globalHandler: GlobalHandler,
-  elementHandler: ElementHandler,
-  codeHandler: CodeHandler,
-  dataHandler: DataHandler,
+  custom_handler: CustomHandler,
+  type_handler: TypeHandler,
+  import_handler: ImportHandler,
+  export_handler: ExportHandler,
+  function_handler: FunctionHandler,
+  table_handler: TableHandler,
+  memory_handler: MemoryHandler,
+  start_handler: StartHandler,
+  global_handler: GlobalHandler,
+  element_handler: ElementHandler,
+  code_handler: CodeHandler,
+  data_handler: DataHandler,
 }
 
 #[derive(Debug)]
@@ -44,57 +43,74 @@ pub enum ValidateError{
 }
 
 pub trait Load{
-  fn validate<R:Read>(&self, data:R)->Result<(), ValidateError>;
-  fn parse<R:Read>(&self, data:R, module: &mut Module) where R: Read + Seek;
+  fn validate<R:Read>(&self, buf_reader:&mut BufReader<R>)->Result<(), ValidateError>;
+  fn parse<R>(&self, data:R, module: &mut Module)->Result<(), ParseError> where R: Read + Seek;
 }
 
+#[derive(Debug)]
+pub enum ParseError{
+  ErrorValidate(ValidateError),
+  ErrorReadingBytes(std::io::Error)
+}
 
-
+impl From<std::io::Error> for ParseError {
+  fn from(e: std::io::Error) -> Self {
+      ParseError::ErrorReadingBytes(e)
+  }
+}
 
 impl Load for Loader{
-  fn validate<R:Read>(&self, data:R)->Result<(), ValidateError> {
-    let mut reader = BufReader::new(data);
-
-    let mut res = walk::<u32, R>(&mut reader);
+  fn validate<R:Read>(&self, buf_reader:&mut BufReader<R>)->Result<(), ValidateError> {
+    let mut res = walk_with_size::<R>(buf_reader, 4);
     if let Err(err) = res{
       return Err(ValidateError::ErrorReadingBytes(err));
     }
-    if res.unwrap() != 0x6D736100{
+    let magic = res.unwrap();
+
+    if magic[0] != 0x00 || magic[1] != 0x61 || magic[2] != 0x73 || magic[3] != 0x6d{
       return Err(ValidateError::ErrorMagicBytes);
     }
 
-    res = walk::<u32, R>(&mut reader);
+    res = walk_with_size::<R>(buf_reader, 4);
     if let Err(err) = res{
       return Err(ValidateError::ErrorReadingBytes(err));
     }
-    if res.unwrap() != 0x1{
+    let version = res.unwrap();
+    if version[0] != 0x01 || version[1] != 0x00 || version[2] != 0x00 || version[3] != 0x00{ 
       return Err(ValidateError::ErrorVersionNumber)
     }
+    println!("Validation passed");
     Ok(())
   }
 
 
-  fn parse<R>(&self, data:R, module: &mut Module) where R: Read + Seek{
+  fn parse<R>(&self, data:R, module: &mut Module)->Result<(), ParseError> where R: Read + Seek{
     let mut buf_reader = BufReader::new(data);
+    let result = self.validate(&mut buf_reader);
+    if result.is_err(){
+      return Err(ParseError::ErrorValidate(result.unwrap_err()));
+    }
     while buf_reader.buffer().len() > 0 {
-      let sectionId = walk::<u8, R>(&mut buf_reader).unwrap();
-      match sectionId {
-        0=>{ self.customHandler.handle(&mut buf_reader, module);}
-        1=>{ self.typeHandler.handle(&mut buf_reader,module); }
-        2=>{ self.importHandler.handle(&mut buf_reader, module); }
-        3=>{ self.functionHandler.handle(&mut buf_reader, module); }
-        4=>{ self.tableHandler.handle(&mut buf_reader, module); }
-        5=>{ self.memoryHandler.handle(&mut buf_reader, module); }
-        6=>{ self.globalHandler.handle(&mut buf_reader, module); }
-        7=>{ self.exportHandler.handle(&mut buf_reader, module); }
-        8=>{ self.startHandler.handle(&mut buf_reader, module); }
-        9=>{ self.elementHandler.handle(&mut buf_reader, module); }
-        10=>{ self.codeHandler.handle(&mut buf_reader, module); }
-        11=>{ self.dataHandler.handle(&mut buf_reader, module); }
+      let section_id = walk::<u8, R>(&mut buf_reader).unwrap();
+      match section_id {
+        0=>{ self.custom_handler.handle(&mut buf_reader, module)?;}
+        1=>{ self.type_handler.handle(&mut buf_reader,module)?; }
+        2=>{ self.import_handler.handle(&mut buf_reader, module)?; }
+        3=>{ self.function_handler.handle(&mut buf_reader, module)?; }
+        4=>{ self.table_handler.handle(&mut buf_reader, module)?; }
+        5=>{ self.memory_handler.handle(&mut buf_reader, module)?; }
+        6=>{ self.global_handler.handle(&mut buf_reader, module)?; }
+        7=>{ self.export_handler.handle(&mut buf_reader, module)?; }
+        8=>{ self.start_handler.handle(&mut buf_reader, module)?; }
+        9=>{ self.element_handler.handle(&mut buf_reader, module)?; }
+        10=>{ self.code_handler.handle(&mut buf_reader, module)?; }
+        11=>{ self.data_handler.handle(&mut buf_reader, module)?; }
         12=>{ todo!(); }
         _ => { todo!();}
       }
     }
+    println!("All section passed");
+    Ok(())
   }
 }
 

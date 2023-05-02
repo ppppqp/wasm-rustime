@@ -1,7 +1,7 @@
 
 // handlers
 use std::io::{BufReader, Seek};
-use super::walker::{walk, walkStr, walkWithDelimiter, walkWithSize};
+use super::walker::{walk, walk_str, walk_with_delimiter, walk_with_size};
 use super::consts::*;
 use crate::instruction::OpCode;
 use crate::Module::module::Module;
@@ -37,7 +37,7 @@ pub struct DataHandler{}
 pub struct CustomHandler{}
 
 impl Handler for HeaderHandler{
-  fn handle<R>(&self, buf_reader: &mut BufReader<R>, module: &mut Module)-> Result<(), std::io::Error> where R: std::io::Read{
+  fn handle<R>(&self, _buf_reader: &mut BufReader<R>, _module: &mut Module)-> Result<(), std::io::Error> where R: std::io::Read{
     Ok(())
   }
 }
@@ -46,25 +46,25 @@ impl Handler for TypeHandler{
   fn handle<R>(&self, buf_reader: &mut BufReader<R>, module: &mut Module)-> Result<(), std::io::Error> where R: std::io::Read{
     let _ = walk::<u32, R>(buf_reader)?;
     let entity_count = walk::<u32, R>(buf_reader)?;
-    for _i in [0..entity_count]{
+    for _i in 0..entity_count{
       if walk::<u32, R>(buf_reader)? != Type::Func as u32{
         // TODO: expection terminate
       }
 
-      let mut funcType: (Vec<u32>, Vec<u32>) = (vec![], vec![]);
-      let paramCount = walk::<u32, R>(buf_reader)?;
-      for _j in [0..paramCount]{
-        funcType.0.push(walk::<u32, R>(buf_reader)?);
+      let mut func_type: (Vec<u32>, Vec<u32>) = (vec![], vec![]);
+      let param_count = walk::<u32, R>(buf_reader)?;
+
+      for _j in 0..param_count{
+        func_type.0.push(walk::<u32, R>(buf_reader)?);
       }
       
-      let resultCount: u32 = walk::<u32, R>(buf_reader)?;
-      for _j in [0..resultCount]{
-        funcType.1.push(walk::<u32, R>(buf_reader)?);
+      let result_count: u32 = walk::<u32, R>(buf_reader)?;
+      for _j in 0..result_count{
+        func_type.1.push(walk::<u32, R>(buf_reader)?);
       }
-
-      module.funcTypes.push(funcType); 
+      module.function_types.push(func_type); 
     }
-
+    println!("Type section passed");
     Ok(())
   }
 }
@@ -72,15 +72,16 @@ impl Handler for TypeHandler{
 impl Handler for ImportHandler{
   fn handle<R>(&self, buf_reader: &mut BufReader<R>, module: &mut Module)-> Result<(), std::io::Error> where R: std::io::Read {
       let _ = walk::<u32, R>(buf_reader)?;
-      let importEntityCount = walk::<u32, R>(buf_reader)?;
-      for _i in [0..importEntityCount]{
-        let moduleNameLen = walk::<u32, R>(buf_reader)?;
-        let moduleNameStr = walkStr(buf_reader, moduleNameLen as usize)?;
-        let fieldLen = walk::<u32, R>(buf_reader)?;
-        let fieldStr = walkStr(buf_reader, fieldLen as usize)?;
+      let import_entity_count = walk::<u32, R>(buf_reader)?;
+      for _i in 0..import_entity_count{
+        let module_name_len = walk::<u32, R>(buf_reader)?;
+        let module_name_str = walk_str(buf_reader, module_name_len as usize)?;
+        let field_len = walk::<u32, R>(buf_reader)?;
+        let field_str = walk_str(buf_reader, field_len as usize)?;
         let description = walk::<u8, R>(buf_reader)?;
-        module.imports.push(Import{module: moduleNameStr, field: fieldStr, description: description});
+        module.imports.push(Import{module: module_name_str, field: field_str, description: description});
       }
+      println!("Import section passed");
       Ok(())
   }
 }
@@ -88,14 +89,15 @@ impl Handler for ImportHandler{
 impl Handler for ExportHandler{
   fn handle<R>(&self, buf_reader: &mut BufReader<R>, module: &mut Module)-> Result<(), std::io::Error> where R: std::io::Read {
       let _ = walk::<u32, R>(buf_reader)?;
-      let exportCount = walk::<u32, R>(buf_reader)?;
-      for _i in [0..exportCount]{
-        let fieldLen = walk::<u32, R>(buf_reader)?;
-        let fieldStr = walkStr(buf_reader, fieldLen as usize)?;
+      let export_count = walk::<u32, R>(buf_reader)?;
+      for _i in 0..export_count{
+        let field_len = walk::<u32, R>(buf_reader)?;
+        let field_str = walk_str(buf_reader, field_len as usize)?;
         let description = walk::<u8, R>(buf_reader)?;
         let index = walk::<u32, R>(buf_reader)?;
-        module.exports.push(Export{field:fieldStr, description:description, index: index});
+        module.exports.push(Export{field:field_str, description:description, index: index});
       }
+      println!("Export section passed");
       Ok(())
   }
 }
@@ -103,11 +105,12 @@ impl Handler for ExportHandler{
 impl Handler for FunctionHandler{
   fn handle<R>(&self, buf_reader: &mut BufReader<R>, module: &mut Module)-> Result<(), std::io::Error> where R: std::io::Read {
       let _ = walk::<u32, R>(buf_reader)?;
-      let functionCount = walk::<u32, R>(buf_reader)?;
-      for _i  in [0..functionCount]{
-        let functionIndex = walk::<u32, R>(buf_reader)?;
-        module.functions.push(Function{index: functionIndex});  
+      let function_count = walk::<u32, R>(buf_reader)?;
+      for _i  in 0..function_count{
+        let function_index = walk::<u32, R>(buf_reader)?;
+        module.functions.push(Function{index: function_index});  
       }
+      println!("Function section passed");
       Ok(())
   }
 }
@@ -115,16 +118,17 @@ impl Handler for FunctionHandler{
 impl Handler for TableHandler{
   fn handle<R>(&self, buf_reader: &mut BufReader<R>, module: &mut Module)-> Result<(), std::io::Error> where R: std::io::Read {
       let _ = walk::<u32, R>(buf_reader);
-      let tableCount = walk::<u32, R>(buf_reader)?;
-      for _i in [0..tableCount]{
-        let elementType = walk::<u8, R>(buf_reader)?;
-        let limitFlag = walk::<u8, R>(buf_reader)?;
-        let limitInitial = walk::<u32, R>(buf_reader)?;
-        let mut table: Table = Table{elementType, limitFlag: limitFlag, limitInitial, limitMax: 0};
-        if limitFlag == LimitFlag::ACTIVE as u8{
-          table.limitMax = walk::<u32, R>(buf_reader)?;
+      let table_count = walk::<u32, R>(buf_reader)?;
+      for _i in 0..table_count{
+        let element_type = walk::<u8, R>(buf_reader)?;
+        let limit_flag = walk::<u8, R>(buf_reader)?;
+        let limit_initial = walk::<u32, R>(buf_reader)?;
+        let mut table: Table = Table{element_type, limit_flag, limit_initial, limit_max: 0};
+        if limit_flag == LimitFlag::ACTIVE as u8{
+          table.limit_max = walk::<u32, R>(buf_reader)?;
         }
         module.tables.push(table);
+        println!("Table section passed");
       }
       Ok(())
   }
@@ -133,24 +137,26 @@ impl Handler for TableHandler{
 impl Handler for MemoryHandler{
   fn handle<R>(&self, buf_reader: &mut BufReader<R>, module: &mut Module)-> Result<(), std::io::Error> where R: std::io::Read {
       let _ = walk::<u32, R>(buf_reader)?;
-      let memoryCount = walk::<u32, R>(buf_reader)?;
-      for _i in [0..memoryCount]{
-        let limitFlag = walk::<u8, R>(buf_reader)?;
-        let limitInitial = walk::<u32, R>(buf_reader)?;
-        let mut memory: Memory = Memory{limitFlag, limitInitial, limitMax: 0};
-        if limitFlag == LimitFlag::ACTIVE as u8{
-          memory.limitMax = walk::<u32, R>(buf_reader)?;
+      let memory_count = walk::<u32, R>(buf_reader)?;
+      for _i in 0..memory_count{
+        let limit_flag = walk::<u8, R>(buf_reader)?;
+        let limit_initial = walk::<u32, R>(buf_reader)?;
+        let mut memory: Memory = Memory{limit_flag, limit_initial, limit_max: 0};
+        if limit_flag == LimitFlag::ACTIVE as u8{
+          memory.limit_max = walk::<u32, R>(buf_reader)?;
         }
         module.memories.push(memory);
       }
+      println!("Memory section passed");
       Ok(())
   }
 }
 
 impl Handler for StartHandler{
   fn handle<R>(&self, buf_reader: &mut BufReader<R>, module: &mut Module)-> Result<(), std::io::Error> where R: std::io::Read {
-    let startIndex = walk::<u32, R>(buf_reader)?;
-    module.startFnIndex = startIndex;
+    let start_index = walk::<u32, R>(buf_reader)?;
+    module.start_index = start_index;
+    println!("Start section passed");
     Ok(())
   }
 }
@@ -158,13 +164,14 @@ impl Handler for StartHandler{
 impl Handler for GlobalHandler{
   fn handle<R>(&self, buf_reader: &mut BufReader<R>, module: &mut Module)-> Result<(), std::io::Error> where R: std::io::Read {
       let _ = walk::<u32, R>(buf_reader)?;
-      let globalCount = walk::<u32, R>(buf_reader)?;
-      for _i in [0..globalCount]{
-        let valueType = walk::<u8, R>(buf_reader)?;
+      let global_count = walk::<u32, R>(buf_reader)?;
+      for _i in 0..global_count{
+        let value_type = walk::<u8, R>(buf_reader)?;
         let mutable = walk::<u8, R>(buf_reader)?;
-        let initExpr = walkWithDelimiter::<u8, R>(buf_reader, OpCode::End as u8)?;
-        module.globals.push(Global{valueType, mutable, initExpr});
+        let init_expr = walk_with_delimiter::<R>(buf_reader, OpCode::End as u8)?;
+        module.globals.push(Global{ value_type, mutable, init_expr});
       }
+      println!("Global section passed");
       Ok(())
   }
 }
@@ -172,22 +179,23 @@ impl Handler for GlobalHandler{
 impl Handler for CodeHandler {
   fn handle<R>(&self, buf_reader: &mut BufReader<R>, module: &mut Module)-> Result<(), std::io::Error> where R: std::io::Read + Seek {
       let _ = walk::<u32, R>(buf_reader)?;
-      let funcDefCount = walk::<u32, R>(buf_reader)?;
-      for _i in [0..funcDefCount]{
-        let bodySize = walk::<u32, R>(buf_reader)?;
-        let localVarStart: u32 = buf_reader.stream_position()? as u32;
-        let totalTypesNum = walk::<u32, R>(buf_reader)?;
-        let mut localVarTypes:Vec<u8> = vec![];
-        for _j in [0..totalTypesNum]{
-          let varCount = walk::<u32, R>(buf_reader)?;
-          let varType = walk::<u8, R>(buf_reader)?;
-          let mut temp = vec![varType; varCount as usize];
-          localVarTypes.append(&mut temp);
+      let func_def_count = walk::<u32, R>(buf_reader)?;
+      for _i in 0..func_def_count{
+        let body_size = walk::<u32, R>(buf_reader)?;
+        let local_var_start: u32 = buf_reader.stream_position()? as u32;
+        let total_types_num = walk::<u32, R>(buf_reader)?;
+        let mut local_var_types:Vec<u8> = vec![];
+        for _j in 0..total_types_num{
+          let var_count: u32 = walk::<u32, R>(buf_reader)?;
+          let var_type = walk::<u8, R>(buf_reader)?;
+          let mut temp = vec![var_type; var_count as usize];
+          local_var_types.append(&mut temp);
         }
-        let localVarEnd: u32 = buf_reader.stream_position()? as u32;
-        let body = walkWithSize::<u8, R>(buf_reader, (bodySize - (localVarEnd - localVarStart)) as usize)?;
-        module.codes.push(Code{localVarTypes, body});
+        let local_var_end: u32 = buf_reader.stream_position()? as u32;
+        let body = walk_with_size::<R>(buf_reader, (body_size - (local_var_end - local_var_start)) as usize)?;
+        module.codes.push(Code{local_var_types, body});
       }
+      println!("Code section passed");
       Ok(())
   }
 }
@@ -195,17 +203,18 @@ impl Handler for CodeHandler {
 impl Handler for ElementHandler{
   fn handle<R>(&self, buf_reader: &mut BufReader<R>, module: &mut Module)-> Result<(), std::io::Error> where R: std::io::Read {
       let _ = walk::<u32, R>(buf_reader);
-      let elementCount = walk::<u32, R>(buf_reader)?;
-      for _i in [0..elementCount]{
-        let tableIndex = walk::<u32, R>(buf_reader)?;
-        let initExpr = walkWithDelimiter::<u8, R>(buf_reader, OpCode::End as u8)?;
-        let funcIndicesCount = walk::<u32, R>(buf_reader)?;
-        let mut funcIndices: Vec<u32> = vec![];
-        for _j in [0..funcIndicesCount]{
-          funcIndices.push(walk::<u32, R>(buf_reader)?);
+      let element_count = walk::<u32, R>(buf_reader)?;
+      for _i in 0..element_count{
+        let table_index = walk::<u32, R>(buf_reader)?;
+        let init_expr = walk_with_delimiter::<R>(buf_reader, OpCode::End as u8)?;
+        let func_indices_count = walk::<u32, R>(buf_reader)?;
+        let mut func_indices: Vec<u32> = vec![];
+        for _j in 0..func_indices_count{
+          func_indices.push(walk::<u32, R>(buf_reader)?);
         }
-        module.elements.push(Element{tableIndex, initExpr, funcIndices});
+        module.elements.push(Element{table_index, init_expr, func_indices});
       }
+      println!("Element section passed");
       Ok(())
   }
 }
@@ -213,23 +222,25 @@ impl Handler for ElementHandler{
 impl Handler for DataHandler {
   fn handle<R>(&self, buf_reader: &mut BufReader<R>, module: &mut Module)-> Result<(), std::io::Error> where R: std::io::Read {
     let _ = walk::<u32, R>(buf_reader);
-    let dataSegCount = walk::<u32, R>(buf_reader)?;
-    for _i in [0..dataSegCount]{
-      let memoryIndex = walk::<u32, R>(buf_reader)?;
-      let initExpr = walkWithDelimiter::<u8, R>(buf_reader, OpCode::End as u8)?;
+    let data_seg_count = walk::<u32, R>(buf_reader)?;
+    for _i in 0..data_seg_count{
+      let memory_index = walk::<u32, R>(buf_reader)?;
+      let init_expr = walk_with_delimiter::<R>(buf_reader, OpCode::End as u8)?;
       let size = walk::<u32, R>(buf_reader)?;
-      let data = walkWithSize::<u8, R>(buf_reader, size as usize)?;
-      module.data.push(Data{memoryIndex, initExpr, data});
+      let data = walk_with_size::<R>(buf_reader, size as usize)?;
+      module.data.push(Data{memory_index, init_expr, data});
     }
+    println!("Data section passed");
     Ok(())
   }
 }
 
 impl Handler for CustomHandler{
-  fn handle<R>(&self, buf_reader: &mut BufReader<R>, module: &mut Module)-> Result<(), std::io::Error> where R: std::io::Read {
+  fn handle<R>(&self, buf_reader: &mut BufReader<R>, _: &mut Module)-> Result<(), std::io::Error> where R: std::io::Read {
     let _ = walk::<u32, R>(buf_reader);
     let size = walk::<u32, R>(buf_reader)?;
-    walkWithSize::<u8, R>(buf_reader, size as usize)?;
+    walk_with_size::<R>(buf_reader, size as usize)?;
+    println!("Custom section passed");
     Ok(())
   }
 }
