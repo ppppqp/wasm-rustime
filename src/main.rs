@@ -1,8 +1,10 @@
 mod Loader;
 mod Module;
 mod instruction;
+mod Executer;
 use Loader::loader::*;
 use Module::module::*;
+use Executer::executor::*;
 use std::fs::File;
 fn main() {
     let loader: Loader::loader::Loader = Default::default();
