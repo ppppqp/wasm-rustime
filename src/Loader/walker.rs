@@ -8,10 +8,47 @@ use std::u8;
 pub trait Walkable{
   fn walk<R>(buf_reader: &mut BufReader<R>) ->Result<Self, std::io::Error> where R: std::io::Read, Self: Sized;
 }
-trait SizedWalkable: Walkable + Sized {}
+
+pub trait Segable{
+  fn seg<R>(buf_reader: &mut BufReader<R>) -> Result<Vec<u8>, std::io::Error> where R: std::io::Read, Self: Sized;
+}
+
+impl Segable for i32{
+  fn seg<R>(buf_reader: &mut BufReader<R>) -> Result<Vec<u8>, std::io::Error> where R: std::io::Read, Self: Sized{
+    let mut buffer = [0];
+    let mut result = Vec::new();
+    let mut value:i32;
+    let mut shift = 0;
+    loop{
+      buf_reader.read_exact(&mut buffer)?;
+      value = buffer[0] as i32;
+      result.push(buffer[0]);
+      shift += 7;
+      if shift >= 32 || value & 0x80 == 0{
+        break;
+      }
+    }
+    Ok(result)
+  }
+}
 
 
-
+impl Segable for u32{
+  fn seg<R>(buf_reader: &mut BufReader<R>) -> Result<Vec<u8>, std::io::Error> where R: std::io::Read, Self: Sized{
+    let mut buffer = [0];
+    let mut value:u32;
+    let mut result = Vec::new();
+    loop{
+      buf_reader.read_exact(&mut buffer)?;
+      value = buffer[0] as u32;
+      result.push(buffer[0]);
+      if value & 0x80 == 0{
+        break;
+      }
+    }
+    Ok(result)
+  }
+}
 
 impl Walkable for i32{
   fn walk<R>(buf_reader: &mut BufReader<R>)->Result<i32, std::io::Error> where R: std::io::Read{

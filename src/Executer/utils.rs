@@ -1,9 +1,13 @@
 use super::value::ValueType;
-
-pub fn get_type_size(value_type: &ValueType) -> usize{
+use crate::Loader::walker::{Segable};
+use std::io::{BufReader};
+pub fn get_type_size(value_type: &ValueType, data: &Vec<u8>) -> usize{
+  let mut buf_reader = BufReader::new(data.as_slice());
   match value_type{
     ValueType::I32=>{
-      return 4;
+      let result = i32::seg(&mut buf_reader);
+      let size = result.unwrap().len();
+      return size;
     }
     ValueType::I64=>{
       return 8;
