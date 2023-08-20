@@ -1,10 +1,10 @@
 mod Loader;
 mod Module;
 mod instruction;
-mod Executer;
+mod Executor;
 use Loader::loader::*;
 use Module::module::*;
-use Executer::executor::*;
+use Executor::executor::*;
 use std::fs::File;
 fn main() {
     let loader: Loader::loader::Loader = Default::default();
@@ -21,6 +21,8 @@ fn main() {
     }
     println!("{:#?}", module);
 
-    let mut executer: Executer::executor::Executer = Default::default();
-    executer.run_function(&module, module.start_index as usize);
+    let mut executer: Executor::executor::Executor = Executor::executor::Executor::new(&module);
+    executer.module = &module;
+    // executer.run_function(&module, module.start_index as usize);
+    executer.run_function(1 as u32);
 }
