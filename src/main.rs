@@ -8,7 +8,7 @@ use Executer::executor::*;
 use std::fs::File;
 fn main() {
     let loader: Loader::loader::Loader = Default::default();
-    let result = File::open("program.wasm");
+    let result = File::open("fib.wasm");
     if result.is_err(){
         println!("Failed to open input file");
     }
@@ -21,6 +21,6 @@ fn main() {
     }
     println!("{:#?}", module);
 
-    let mut executer: Executer::executor::Executer = Default::default();
-    executer.run_function(&module, module.start_index as usize);
+    // let mut executer: Executer::executor::Executer = Default::default();
+    // executer.run_function(&module, module.start_index as usize);
 }

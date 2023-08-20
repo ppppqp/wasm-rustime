@@ -1,6 +1,6 @@
 use std::fmt;
 
-use super::utils::get_type_size;
+use super::utils::{get_type_size, read_one};
 use super::value::{I32, ValueType};
 
 pub trait Stackish{
@@ -11,9 +11,27 @@ pub trait Stackish{
   fn size(&self)->usize;
   fn empty(&self)->bool;
 }
+
+
+pub struct Label{
+  pub arity: u8,
+  pub target: (u32, u32) // (start pc, end pc)
+}
+
+pub struct ActivationFrame{
+  pub index: u8, // index of this activation frame in bookkeeping
+  pub locals: Vec<u8>,
+  // TODO: reference to its own module instance  
+}
+
+pub struct AfMeta{
+  pub len: u8, // lenght of the data
+  pub reference: Vec<u8> // the index of each arguments in the corresponding ActivationFrame data
+}
+
 #[derive(Default)]
 pub struct Stack{
-  inner: Vec<u8>
+  inner: Vec<u8>,
 }
 #[derive(Debug)]
 pub enum StackErr{
@@ -54,6 +72,12 @@ impl fmt::Debug for StackElement {
         ValueType::RefExtern=>{
 
         }
+        ValueType::Label=>{
+
+        }
+        ValueType::Activation=>{
+          
+        }
 
       }
       Ok(())
@@ -74,9 +98,8 @@ impl Stackish for Stack{
       }
       let value_type:ValueType = result.unwrap();
       // get an element from the stack
-      let data_size = get_type_size(&value_type, &self.inner);
-      let length = self.inner.len();
-      let data = self.inner.as_slice()[length - data_size..].to_vec();
+      let data_size = get_type_size(&value_type);
+      let data = read_one(&self.inner, &value_type);
       for _ in 0..data_size{
         self.inner.pop();
       }
