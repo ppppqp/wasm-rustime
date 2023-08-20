@@ -1,8 +1,9 @@
 use crate::Loader::walker::{Walkable, Segable, walk, walk_str, walk_with_delimiter, walk_with_size};
 use std::{convert::TryFrom, io::BufReader, io::Read};
 use crate::instruction::{OpCode};
-use super::stack::{Stack, Stackish, ActivationFrame, AfMeta};
+use super::stack::*;
 use super::value::{I32, I64, F32, F64, ValueType};
+use super::value::*;
 use crate::Module::module::{Module, Function, Code};
 use super::utils::{LEB_to_native, get_type_size};
 
@@ -46,10 +47,17 @@ pub struct Executer{
 }
 
 pub struct Instruction{
-  opCode: OpCode,
-  params: Vec<u8>
+  op_code: OpCode,
+  params: Vec<Param>
 }
 
+pub enum Param{
+  I32(Box<I32>),
+  I64(Box<I64>),
+  F32(Box<F32>),
+  F64(Box<F64>),
+  V128(Box<V128>),
+}
 
 pub struct ExecutionRes{
   // data: Vec<u8>,
@@ -60,17 +68,72 @@ pub enum ExecutionErr{
   Terminate
 }
 
+
+impl From<StackElement> for Param{
+  fn from(value: StackElement) -> Self {
+      match value {
+          StackElement::I32(v)  => Param::I32(v),
+          StackElement::I64(v)  => Param::I64(v),
+          StackElement::F32(v)  => Param::F32(v),
+          StackElement::F64(v)  => Param::F64(v),
+          _ => panic!("type converstion error"),
+      }
+  }
+}
+
+impl From<Param> for StackElement{
+  fn from(value: Param) -> Self {
+      match value {
+          Param::I32(v)  => StackElement::I32(v),
+          Param::I64(v)  => StackElement::I64(v),
+          Param::F32(v)  => StackElement::F32(v),
+          Param::F64(v)  => StackElement::F64(v),
+          Param::V128(v)  => StackElement::V128(v),
+          _ => panic!("type converstion error"),
+      }
+  }
+}
+
+impl Clone for Param{
+  fn clone(&self) -> Self {
+      match self{
+        Param::I32(v)  => Param::I32(Box::new(I32{inner: (*v).inner})),
+        Param::I64(v)  => Param::I64(Box::new(I64{inner: (*v).inner})),
+        Param::F32(v)  => Param::F32(Box::new(F32{inner: (*v).inner})),
+        Param::F64(v)  => Param::F64(Box::new(F64{inner: (*v).inner})),
+        Param::V128(v)  => Param::V128(Box::new(V128{inner: (*v).inner.to_vec()}))
+      }
+  }
+}
+
+impl From<NativeNumeric> for Param{
+  fn from(value: NativeNumeric) -> Self {
+    match value{
+      NativeNumeric::I32(v) => Param::I32(Box::new(I32{inner: v})),
+      NativeNumeric::F32(v) => Param::F32(Box::new(F32{inner: v})),
+      NativeNumeric::I64(v) => Param::I64(Box::new(I64{inner: v})),
+      NativeNumeric::F64(v) => Param::F64(Box::new(F64{inner: v})),
+
+    }
+  }
+}
+
+
 impl ExecuterTrait for Executer{
   fn handle_inst(self: &mut Self, inst: &Instruction)->Result<ExecutionRes, ExecutionErr>{
-    match inst.opCode{
+    match inst.op_code{
       OpCode::I32Const =>{
         // let result:Result<I32,_> = inst.params.try_into();
         // TODO: error handling
-        self.stack.push(ValueType::I32, &inst.params);
+        let stack_element: StackElement = (inst.params[0].clone()).into();
+        self.stack.push(stack_element);
         return Ok(ExecutionRes{});
       }
       OpCode::End => {
         return Err(ExecutionErr::Terminate);
+      }
+      _ => {
+        panic!("op code not implemented");
       }
     }
   }
@@ -110,7 +173,7 @@ impl ExecuterTrait for Executer{
       locals: get_af_locals(&code.local_var_types)
     };
     self.af_meta.push(af_meta);
-    self.stack.push(ValueType::Activation, &af.try_into().unwrap());
+    self.stack.push(StackElement::Activation(Box::new(af)));
     self.run(&result);
   }
 }
@@ -163,10 +226,14 @@ fn parse_code(code: &Code)->Vec<Instruction>{
           println!("Error parsing I32Const");
           panic!();
         }
-        res.push(Instruction { opCode: op, params: parameter_native.unwrap()});
+        let native = parameter_native.unwrap();
+        res.push(Instruction { op_code: op, params: vec![native.into()]});
       }
       OpCode::End=>{
-        res.push(Instruction { opCode: op, params: vec![]});
+        res.push(Instruction { op_code: op, params: vec![]});
+      }
+      _ => {
+        panic!("can not parse")
       }
     }
   }

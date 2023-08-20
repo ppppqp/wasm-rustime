@@ -13,6 +13,28 @@ pub struct F32{
 pub struct F64{
   pub inner: f64
 }
+pub struct V128{
+  pub inner: Vec<u8>
+}
+pub struct RefNull{
+  pub inner: ()
+}
+pub struct RefFunc{
+  pub inner: u8
+}
+pub struct RefExtern{
+  pub inner: u8
+}
+
+
+pub enum NativeNumeric{
+  I32(i32),
+  I64(i64),
+  F32(f32),
+  F64(f64)
+}
+
+
 
 #[derive(Debug)]
 pub enum ValueType{

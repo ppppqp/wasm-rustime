@@ -9,7 +9,7 @@ pub enum OpCode{
   LocalTee = 0x22,
   GlobalGet = 0x23,
   GlobalSet = 0x24,
-  BlockTypeE = 0x40
+  BlockTypeE = 0x40,
   End = 0xb
 }
 

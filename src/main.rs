@@ -21,6 +21,6 @@ fn main() {
     }
     println!("{:#?}", module);
 
-    // let mut executer: Executer::executor::Executer = Default::default();
-    // executer.run_function(&module, module.start_index as usize);
+    let mut executer: Executer::executor::Executer = Default::default();
+    executer.run_function(&module, module.start_index as usize);
 }
