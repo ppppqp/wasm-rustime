@@ -1,6 +1,7 @@
 use crate::Loader::walker::{Walkable};
 use std::io::{BufReader};
 use crate::Executor::stack::{ActivationFrame, Label};
+use crate::Loader::consts::Type;
 pub struct I32{
   pub inner: i32
 }
@@ -28,6 +29,7 @@ pub struct RefExtern{
 }
 
 
+#[derive(Debug)]
 pub enum NativeNumeric{
   I32(i32),
   I64(i64),
@@ -49,6 +51,21 @@ pub enum ValueType{
   RefExtern = 7,
   Label = 8,
   Activation = 9,
+}
+
+impl TryFrom<Type> for ValueType{
+  type Error = ();
+  fn try_from(v: Type) -> Result<Self, ()>{
+    match v{
+      Type::I32 => Ok(ValueType::I32),
+      Type::I64 => Ok(ValueType::I64),
+      Type::F32 => Ok(ValueType::F32),
+      Type::F64 => Ok(ValueType::F64),
+      Type::FuncRef => Ok(ValueType::RefFunc),
+      Type::ExternRef => Ok(ValueType::RefExtern),
+      _ => Err(())
+    }
+  }
 }
 
 impl From<I32> for Vec<u8>{

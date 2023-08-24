@@ -4,6 +4,7 @@ use crate::instruction::{OpCode};
 use super::stack::*;
 use super::value::{I32, I64, F32, F64, ValueType};
 use super::value::*;
+use crate::Loader::consts::{Type};
 use crate::Module::module::{Module, Function, Code};
 use super::utils::{LEB_to_native, get_type_size};
 
@@ -52,11 +53,11 @@ pub struct Instruction{
 }
 
 pub enum Param{
-  I32(Box<I32>),
-  I64(Box<I64>),
-  F32(Box<F32>),
-  F64(Box<F64>),
-  V128(Box<V128>),
+  I32(I32),
+  I64(I64),
+  F32(F32),
+  F64(F64),
+  V128(V128),
 }
 
 pub struct ExecutionRes{
@@ -72,10 +73,10 @@ pub enum ExecutionErr{
 impl From<StackElement> for Param{
   fn from(value: StackElement) -> Self {
       match value {
-          StackElement::I32(v)  => Param::I32(v),
-          StackElement::I64(v)  => Param::I64(v),
-          StackElement::F32(v)  => Param::F32(v),
-          StackElement::F64(v)  => Param::F64(v),
+          StackElement::I32(v)  => Param::I32(I32{inner: (*v).inner}),
+          StackElement::I64(v)  => Param::I64(I64{inner: (*v).inner}),
+          StackElement::F32(v)  => Param::F32(F32{inner: (*v).inner}),
+          StackElement::F64(v)  => Param::F64(F64{inner: (*v).inner}),
           _ => panic!("type converstion error"),
       }
   }
@@ -84,11 +85,11 @@ impl From<StackElement> for Param{
 impl From<Param> for StackElement{
   fn from(value: Param) -> Self {
       match value {
-          Param::I32(v)  => StackElement::I32(v),
-          Param::I64(v)  => StackElement::I64(v),
-          Param::F32(v)  => StackElement::F32(v),
-          Param::F64(v)  => StackElement::F64(v),
-          Param::V128(v)  => StackElement::V128(v),
+          Param::I32(v)  => StackElement::I32(Box::new(v)),
+          Param::I64(v)  => StackElement::I64(Box::new(v)),
+          Param::F32(v)  => StackElement::F32(Box::new(v)),
+          Param::F64(v)  => StackElement::F64(Box::new(v)),
+          Param::V128(v)  => StackElement::V128(Box::new(v)),
           _ => panic!("type converstion error"),
       }
   }
@@ -97,11 +98,11 @@ impl From<Param> for StackElement{
 impl Clone for Param{
   fn clone(&self) -> Self {
       match self{
-        Param::I32(v)  => Param::I32(Box::new(I32{inner: (*v).inner})),
-        Param::I64(v)  => Param::I64(Box::new(I64{inner: (*v).inner})),
-        Param::F32(v)  => Param::F32(Box::new(F32{inner: (*v).inner})),
-        Param::F64(v)  => Param::F64(Box::new(F64{inner: (*v).inner})),
-        Param::V128(v)  => Param::V128(Box::new(V128{inner: (*v).inner.to_vec()}))
+        Param::I32(v)  => Param::I32(I32{inner: (*v).inner}),
+        Param::I64(v)  => Param::I64(I64{inner: (*v).inner}),
+        Param::F32(v)  => Param::F32(F32{inner: (*v).inner}),
+        Param::F64(v)  => Param::F64(F64{inner: (*v).inner}),
+        Param::V128(v)  => Param::V128(V128{inner: (*v).inner.to_vec()})
       }
   }
 }
@@ -109,10 +110,10 @@ impl Clone for Param{
 impl From<NativeNumeric> for Param{
   fn from(value: NativeNumeric) -> Self {
     match value{
-      NativeNumeric::I32(v) => Param::I32(Box::new(I32{inner: v})),
-      NativeNumeric::F32(v) => Param::F32(Box::new(F32{inner: v})),
-      NativeNumeric::I64(v) => Param::I64(Box::new(I64{inner: v})),
-      NativeNumeric::F64(v) => Param::F64(Box::new(F64{inner: v})),
+      NativeNumeric::I32(v) => Param::I32(I32{inner: v}),
+      NativeNumeric::F32(v) => Param::F32(F32{inner: v}),
+      NativeNumeric::I64(v) => Param::I64(I64{inner: v}),
+      NativeNumeric::F64(v) => Param::F64(F64{inner: v}),
 
     }
   }
@@ -197,32 +198,34 @@ impl ExecutorTrait for Executor<'_>{
 
 
 
-fn get_af_references(local_var_types: &Vec<u8>)->Vec<u8>{
+fn get_af_references(local_var_types: &Vec<Type>)->Vec<u8>{
   let mut ret: Vec<u8> = vec![];
   let mut ref_index = 0;
   for i in 0..local_var_types.len(){
+    // println!("{}", local_var_types[i]);
     ret.push(ref_index);
     let size = get_type_size(&local_var_types[i].try_into().unwrap());
     ref_index += size as u8;
   }
   ret
 }
-fn get_af_locals(local_var_types: &Vec<u8>)->Vec<Box<Param>>{
+fn get_af_locals(local_var_types: &Vec<Type>)->Vec<Box<Param>>{
   let mut ret: Vec<Box<Param>> = vec![];
   for i in 0..local_var_types.len() {
+    // println!("{}", &local_var_types[i]);
     let value_type: &ValueType = &local_var_types[i].try_into().unwrap();
     match value_type {
       ValueType::I32 => {
-        ret.push(Box::new(Param::I32(Box::new(I32{inner: 0}))));
+        ret.push(Box::new(Param::I32(I32{inner: 0})));
       }
       ValueType::I64 => {
-        ret.push(Box::new(Param::I64(Box::new(I64{inner: 0}))));
+        ret.push(Box::new(Param::I64(I64{inner: 0})));
       }
       ValueType::F32 => {
-        ret.push(Box::new(Param::F32(Box::new(F32{inner: 0.0}))));
+        ret.push(Box::new(Param::F32(F32{inner: 0.0})));
       }
       ValueType::F64 => {
-        ret.push(Box::new(Param::F64(Box::new(F64{inner: 0.0}))));
+        ret.push(Box::new(Param::F64(F64{inner: 0.0})));
       }
       _ => panic!("not implemented")
     }
@@ -236,7 +239,7 @@ fn parse_code(code: &Code)->Vec<Instruction>{
   while i < code.body.len() {
     let result: Result<OpCode, ()> = code.body[i].try_into();
     if result.is_err(){
-      println!("{}", i);
+      println!("{}", code.body[i]);
       println!("Error parsing instruction");
       panic!();
     }
@@ -258,23 +261,76 @@ fn parse_code(code: &Code)->Vec<Instruction>{
           println!("Error parsing I32Const");
           panic!();
         }
-        let native = parameter_native.unwrap();
+        let native: NativeNumeric = parameter_native.unwrap();
+        println!("{:?}", native);
         res.push(Instruction { op_code: op, params: vec![native.into()]});
       }
       OpCode::Call => {
         //FIXME: should be unsigned
-        let result = i32::walk(&mut buf_reader);
+        //FIXME: LEB
+        let result = i8::walk(&mut buf_reader);
+        i += 1;
         if result.is_err(){
           panic!("Error parsing");
         }
         let function_idx = result.unwrap();
-        res.push(Instruction{ op_code: op, params: vec![Param::I32(Box::new(I32{inner: function_idx}))]});
+        println!("{}", function_idx);
+        res.push(Instruction{ op_code: op, params: vec![Param::I32(I32{inner: function_idx.into()})]});
       }
-      OpCode::Unreachable => {
+      OpCode::LocalSet | OpCode::LocalGet => {
+        // params: [index_of_local_var]
 
+        //FIXME: should be unsigned
+        //FIXME: LEB
+        let result = i8::walk(&mut buf_reader);
+        i += 1;
+        if result.is_err(){
+          panic!("Error parsing");
+        }
+        let localidx = result.unwrap();
+        println!("{}", localidx);
+
+        res.push(Instruction{ op_code: op, params: vec![
+          Param::I32(I32{inner: localidx.into()})
+        ]});
+
+      }
+      OpCode::Unreachable | OpCode::Nop => {
+
+      }
+      OpCode::Block | OpCode::Loop => {
+        // params: [block_type, ]
+        // FIXME: should also consider the type index (i32 encoded in LEB128)
+        let result = i8::walk(&mut buf_reader);
+        i += 1;
+        if result.is_err() {
+          panic!("Error parsing");
+        }
+        let mut params: Vec<Param> = vec![];
+        let result_u8 = result.unwrap();
+        // FIXME: should also implement the cases for numtype, vectype, reftype, etc
+        // let epsilon_u8: u8 = OpCode::BlockTypeE as u8;
+        match result_u8 {
+          num_u8 =>{
+            params.push(Param::I32(I32{inner: i32::from(num_u8)}));
+          }
+          _ => panic!("Error parsing")
+        }
       }
       OpCode::End =>{
         res.push(Instruction { op_code: op, params: vec![]});
+      }
+      OpCode::I32Eq | OpCode::I32Ne | OpCode::I32Or | OpCode::I32Add => {
+        res.push(Instruction { op_code: op, params: vec![]});
+      }
+      OpCode::BrIf => {
+        // params: [labelidx] branch out of labelidx(th) block
+        //FIXME: should be unsigned
+        //FIXME: LEB
+        let result = i8::walk(&mut buf_reader);
+        let label_idx = result.unwrap();
+        println!("{}", label_idx);
+        res.push(Instruction { op_code: op, params: vec![Param::I32(I32{inner: i32::from(label_idx)})]});
       }
       _ => {
         panic!("can not parse")

@@ -23,6 +23,6 @@ fn main() {
 
     let mut executer: Executor::executor::Executor = Executor::executor::Executor::new(&module);
     executer.module = &module;
-    // executer.run_function(&module, module.start_index as usize);
+    // executer.run_function( module.start_index);
     executer.run_function(1 as u32);
 }
