@@ -117,8 +117,8 @@ impl Handler for FunctionHandler{
       let _ = walk::<u32, R>(buf_reader)?;
       let function_count = walk::<u32, R>(buf_reader)?;
       for _i  in 0..function_count{
-        let function_index = walk::<u32, R>(buf_reader)?;
-        module.functions.push(Function{index: function_index});  
+        let type_index = walk::<u32, R>(buf_reader)?;
+        module.functions.push(Function{type_index: type_index});  
       }
       println!("Function section passed");
       Ok(())

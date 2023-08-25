@@ -38,7 +38,7 @@ pub trait ExecutorTrait{
   fn handle_inst(self: &mut Self, inst: &Instruction)->Result<ExecutionRes, ExecutionErr>;
   fn run(self: &mut Self, program: &Vec<Instruction>);
   fn run_function(self: &mut Self, index: u32);
-  }
+}
 pub struct Executor<'a>{
   pc: usize,  
   stack: Stack,
@@ -81,6 +81,7 @@ impl From<StackElement> for Param{
       }
   }
 }
+
 
 impl From<Param> for StackElement{
   fn from(value: Param) -> Self {
@@ -131,21 +132,45 @@ impl<'a> Executor<'a> {
   }
 }
 
+impl Executor<'_>{
+  fn get_current_af(&mut self)->Result<&mut Box<ActivationFrame>, ()>{
+    let len = self.af_meta.len();
+    let current_af_meta = &mut self.af_meta[ len - 1];
+
+    if let Ok(StackElement::Activation(current_af_boxed))= self.stack.get(current_af_meta.position){
+      return Ok(current_af_boxed);
+    } else{
+      return Err(());
+    }
+  }
+}
+
 impl ExecutorTrait for Executor<'_>{
   fn handle_inst(self: &mut Self, inst: &Instruction)->Result<ExecutionRes, ExecutionErr>{
+    println!("{:#?}", inst.op_code);
     match inst.op_code{
       OpCode::I32Const =>{
         // let result:Result<I32,_> = inst.params.try_into();
         // TODO: error handling
         let stack_element: StackElement = (inst.params[0].clone()).into();
         self.stack.push(stack_element);
+
         return Ok(ExecutionRes{});
       }
       OpCode::Call => {
         if let Param::I32(function_idx) = &inst.params[0]{
+          // FIXME:
           self.run_function((*function_idx).inner.try_into().unwrap());
         }
         return Ok(ExecutionRes {  });
+      }
+      OpCode::LocalSet => {
+        if let Param::I32(local_idx) = &inst.params[0]{
+          let value = self.stack.pop().unwrap();
+          let current_af = self.get_current_af().unwrap();
+          (*current_af).locals[(*local_idx).inner as usize] = Box::new(value.clone().into());
+        }
+        return Ok(ExecutionRes {});
       }
       OpCode::End => {
         return Err(ExecutionErr::Terminate);
@@ -157,11 +182,14 @@ impl ExecutorTrait for Executor<'_>{
   }
 
   fn run(self: &mut Self, program: &Vec<Instruction>){
+    println!("!!+++++++++++++++Execution Start+++++++++++++++++++!!");
+    //TODO: fix me
+    let mut pc = 0;
     loop{
-      let result = self.handle_inst(&program[self.pc]);
+      let result = self.handle_inst(&program[pc]);
       match result{
         Ok(_)=>{
-          self.pc += 1;
+          pc += 1;
         },
         Err(ExecutionErr::Terminate)=>{
           let final_result = self.stack.pop();
@@ -184,33 +212,44 @@ impl ExecutorTrait for Executor<'_>{
   fn run_function(self: &mut Self, index: u32) {
     let code: &Code = &self.module.codes[index as usize];
     let result = parse_code(code);
+    // get the local arguments
+    let func_type_index = self.module.functions[index as usize].type_index;
+    let func_param_types = &self.module.function_types[func_type_index as usize].0;
+    let func_param_count = func_param_types.len();
+    // pop from the stack and put into the stack frame
+    let mut params: Vec<Box<Param>> = vec![];
+    for _i in 0..func_param_count {
+      let stack_element = self.stack.pop().unwrap();
+      params.push(Box::new(stack_element.into()));
+    }
     // push a stack frame
-    let af_meta: AfMeta = AfMeta { len: code.local_var_types.len() as u8, reference: get_af_references(&code.local_var_types) };
+    let af_meta: AfMeta = AfMeta { len: code.local_var_types.len() as u8, position: self.stack.size()};
     let af = ActivationFrame{
       index: self.af_meta.len() as u8,
-      locals: get_af_locals(&code.local_var_types)
+      locals: get_af_locals(&params, &code.local_var_types),
     };
     self.af_meta.push(af_meta);
     self.stack.push(StackElement::Activation(Box::new(af)));
+    
     self.run(&result);
   }
 }
 
 
 
-fn get_af_references(local_var_types: &Vec<Type>)->Vec<u8>{
-  let mut ret: Vec<u8> = vec![];
-  let mut ref_index = 0;
-  for i in 0..local_var_types.len(){
-    // println!("{}", local_var_types[i]);
-    ret.push(ref_index);
-    let size = get_type_size(&local_var_types[i].try_into().unwrap());
-    ref_index += size as u8;
-  }
-  ret
-}
-fn get_af_locals(local_var_types: &Vec<Type>)->Vec<Box<Param>>{
-  let mut ret: Vec<Box<Param>> = vec![];
+// fn get_af_references(local_var_types: &Vec<Type>)->Vec<u8>{
+//   let mut ret: Vec<u8> = vec![];
+//   let mut ref_index = 0;
+//   for i in 0..local_var_types.len(){
+//     // println!("{}", local_var_types[i]);
+//     ret.push(ref_index);
+//     let size = get_type_size(&local_var_types[i].try_into().unwrap());
+//     ref_index += size as u8;
+//   }
+//   ret
+// }
+fn get_af_locals(params: &Vec<Box<Param>>, local_var_types: &Vec<Type>)->Vec<Box<Param>>{
+  let mut ret: Vec<Box<Param>> = params.to_vec();
   for i in 0..local_var_types.len() {
     // println!("{}", &local_var_types[i]);
     let value_type: &ValueType = &local_var_types[i].try_into().unwrap();

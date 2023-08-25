@@ -2,28 +2,36 @@ use crate::Loader::walker::{Walkable};
 use std::io::{BufReader};
 use crate::Executor::stack::{ActivationFrame, Label};
 use crate::Loader::consts::Type;
+#[derive(Clone)]
 pub struct I32{
   pub inner: i32
 }
+#[derive(Clone)]
 pub struct I64{
   pub inner: i64
 }
+#[derive(Clone)]
 pub struct F32{
   pub inner: f32
 }
+#[derive(Clone)]
 pub struct F64{
   pub inner: f64
 }
+#[derive(Clone)]
 pub struct V128{
   pub inner: Vec<u8>
 }
+#[derive(Clone)]
 pub struct RefNull{
   pub inner: ()
 }
+#[derive(Clone)]
 pub struct RefFunc{
   //FIXME: should be unsigned
   pub inner: i32
 }
+#[derive(Clone)]
 pub struct RefExtern{
   pub inner: u8
 }

@@ -12,7 +12,7 @@ pub struct Import{
 
 #[derive(Debug)]
 pub struct Function{
-  pub index: u32
+  pub type_index: u32
 }
 #[derive(Debug)]
 pub struct Export{
