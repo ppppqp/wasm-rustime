@@ -52,6 +52,7 @@ pub struct Instruction{
   params: Vec<Param>
 }
 
+#[derive(Debug)]
 pub enum Param{
   I32(I32),
   I64(I64),
@@ -164,11 +165,53 @@ impl ExecutorTrait for Executor<'_>{
         }
         return Ok(ExecutionRes {  });
       }
+      OpCode::LocalGet => {
+        if let Param::I32(local_idx) = &inst.params[0]{
+          let current_af = self.get_current_af().unwrap();
+          let value =  (*current_af).locals[(*local_idx).inner as usize].clone();
+          println!("{:#?}", value);
+          self.stack.push((value).into());
+        }
+        return Ok(ExecutionRes {  });
+      }
       OpCode::LocalSet => {
         if let Param::I32(local_idx) = &inst.params[0]{
           let value = self.stack.pop().unwrap();
           let current_af = self.get_current_af().unwrap();
-          (*current_af).locals[(*local_idx).inner as usize] = Box::new(value.clone().into());
+          (*current_af).locals[(*local_idx).inner as usize] = value.clone().into();
+        }
+        return Ok(ExecutionRes {});
+      }
+      OpCode::I32Or => {
+        let top1 = self.stack.pop().unwrap();
+        let top2 = self.stack.pop().unwrap();
+        if let StackElement::I32(top1_value) = top1{
+          if let StackElement::I32(top2_value) = top2{
+            //FIXME: bitwise disjunction?
+            self.stack.push(StackElement::I32(Box::new(I32{inner: (*top1_value).inner | (*top2_value).inner})));
+          }
+        }
+        return Ok(ExecutionRes {});
+      }
+      OpCode::I32Eq => {
+        let top1 = self.stack.pop().unwrap();
+        let top2 = self.stack.pop().unwrap();
+        if let StackElement::I32(top1_value) = top1{
+          if let StackElement::I32(top2_value) = top2{
+            let mut value = 0;
+            if (*top1_value).inner == (*top2_value).inner{
+              value = 1;
+            }
+            self.stack.push(StackElement::I32(Box::new(I32{inner: value})));
+          }
+        }
+        return Ok(ExecutionRes {});
+      }
+      OpCode::Block => {
+
+      }
+      OpCode::BrIf => {
+        if let Param::I32(label_idx) = &inst.params[0]{
         }
         return Ok(ExecutionRes {});
       }
@@ -217,10 +260,10 @@ impl ExecutorTrait for Executor<'_>{
     let func_param_types = &self.module.function_types[func_type_index as usize].0;
     let func_param_count = func_param_types.len();
     // pop from the stack and put into the stack frame
-    let mut params: Vec<Box<Param>> = vec![];
+    let mut params: Vec<Param> = vec![];
     for _i in 0..func_param_count {
       let stack_element = self.stack.pop().unwrap();
-      params.push(Box::new(stack_element.into()));
+      params.push(stack_element.into());
     }
     // push a stack frame
     let af_meta: AfMeta = AfMeta { len: code.local_var_types.len() as u8, position: self.stack.size()};
@@ -248,23 +291,23 @@ impl ExecutorTrait for Executor<'_>{
 //   }
 //   ret
 // }
-fn get_af_locals(params: &Vec<Box<Param>>, local_var_types: &Vec<Type>)->Vec<Box<Param>>{
-  let mut ret: Vec<Box<Param>> = params.to_vec();
+fn get_af_locals(params: &Vec<Param>, local_var_types: &Vec<Type>)->Vec<Param>{
+  let mut ret: Vec<Param> = params.to_vec();
   for i in 0..local_var_types.len() {
     // println!("{}", &local_var_types[i]);
     let value_type: &ValueType = &local_var_types[i].try_into().unwrap();
     match value_type {
       ValueType::I32 => {
-        ret.push(Box::new(Param::I32(I32{inner: 0})));
+        ret.push(Param::I32(I32{inner: 0}));
       }
       ValueType::I64 => {
-        ret.push(Box::new(Param::I64(I64{inner: 0})));
+        ret.push(Param::I64(I64{inner: 0}));
       }
       ValueType::F32 => {
-        ret.push(Box::new(Param::F32(F32{inner: 0.0})));
+        ret.push(Param::F32(F32{inner: 0.0}));
       }
       ValueType::F64 => {
-        ret.push(Box::new(Param::F64(F64{inner: 0.0})));
+        ret.push(Param::F64(F64{inner: 0.0}));
       }
       _ => panic!("not implemented")
     }
@@ -355,6 +398,7 @@ fn parse_code(code: &Code)->Vec<Instruction>{
           }
           _ => panic!("Error parsing")
         }
+        res.push(Instruction { op_code: op, params: params});
       }
       OpCode::End =>{
         res.push(Instruction { op_code: op, params: vec![]});

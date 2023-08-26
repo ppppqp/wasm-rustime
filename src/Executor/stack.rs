@@ -22,7 +22,7 @@ pub struct Label{
 #[derive(Clone)]
 pub struct ActivationFrame{
   pub index: u8, // index of this activation frame in bookkeeping
-  pub locals: Vec<Box<Param>>,
+  pub locals: Vec<Param>,
   // TODO: reference to its own module instance  
 }
 
