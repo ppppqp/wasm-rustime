@@ -21,8 +21,9 @@ fn main() {
     }
     println!("{:#?}", module);
 
-    let mut executer: Executor::executor::Executor = Executor::executor::Executor::new(&module);
-    executer.module = &module;
+    let mut executor: Executor::executor::Executor = Executor::executor::Executor::new(&module);
+    executor.module = &module;
+    executor.init();
     // executer.run_function( module.start_index);
-    executer.run_function(1 as u32);
+    executor.run_function(1 as u32);
 }
