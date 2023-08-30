@@ -152,6 +152,7 @@ impl TryFrom<Vec<u8>> for Label{
 
     let ret = Label{
       arity: v[0],
+      continuation: target2, // FIXME:
       target: (target1, target2)
     };
     Ok(ret)

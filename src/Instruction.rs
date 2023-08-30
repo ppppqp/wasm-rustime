@@ -1,6 +1,6 @@
 use self::OpCode::*;
 use std::slice::Iter;
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum OpCode{
   Unreachable = 0x00,
   Nop = 0x01,

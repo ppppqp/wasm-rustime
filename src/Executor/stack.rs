@@ -16,12 +16,14 @@ pub trait Stackish{
 #[derive(Clone)]
 pub struct Label{
   pub arity: u8,
+  pub continuation: u32,
   pub target: (u32, u32) // (start pc, end pc)
 }
 
 #[derive(Clone)]
 pub struct ActivationFrame{
   pub index: u8, // index of this activation frame in bookkeeping
+  pub arity: u8, // arity of local value
   pub locals: Vec<Param>,
   // TODO: reference to its own module instance  
 }

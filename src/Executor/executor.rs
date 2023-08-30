@@ -10,7 +10,9 @@ use crate::Loader::walker::{
 use crate::Module::module::{Code, Function, Module};
 use std::collections::HashMap;
 use std::{convert::TryFrom, io::BufReader, io::Read};
-
+fn print_type_of<T>(_: &T) {
+  println!("{}", std::any::type_name::<T>())
+}
 impl TryFrom<u8> for ValueType {
     type Error = ();
     fn try_from(val: u8) -> Result<ValueType, ()> {
@@ -43,7 +45,7 @@ struct FunctionInfo {
     end: u32,
 }
 pub trait ExecutorTrait {
-    fn handle_inst(self: &mut Self, inst: &Instruction) -> Result<ExecutionRes, ExecutionErr>;
+    fn handle_inst(self: &mut Self, inst: &Instruction, terminal: u32) -> Result<ExecutionRes, ExecutionErr>;
     fn run(self: &mut Self, terminal: u32);
     fn run_function(self: &mut Self, index: u32);
 }
@@ -150,7 +152,6 @@ impl<'a> Executor<'a> {
             }
             let op = result.unwrap();
             i += 1;
-            println!("op:{:#?}", op);
             let mut buf_reader = BufReader::new(&code.body[i..]);
             match op {
                 OpCode::I32Const => {
@@ -167,7 +168,6 @@ impl<'a> Executor<'a> {
                         panic!();
                     }
                     let native: NativeNumeric = parameter_native.unwrap();
-                    println!("{:?}", native);
                     res.push(Instruction {
                         op_code: op,
                         params: vec![native.into()],
@@ -182,7 +182,6 @@ impl<'a> Executor<'a> {
                         panic!("Error parsing");
                     }
                     let function_idx = result.unwrap();
-                    println!("{}", function_idx);
                     res.push(Instruction {
                         op_code: op,
                         params: vec![Param::I32(I32 {
@@ -201,7 +200,6 @@ impl<'a> Executor<'a> {
                         panic!("Error parsing");
                     }
                     let localidx = result.unwrap();
-                    println!("{}", localidx);
 
                     res.push(Instruction {
                         op_code: op,
@@ -227,7 +225,6 @@ impl<'a> Executor<'a> {
                     }
                     let mut params: Vec<Param> = vec![];
                     let result_u8 = result.unwrap();
-                    println!("type: {}", result_u8);
                     // FIXME: should also implement the cases for numtype, vectype, reftype, etc
                     // let epsilon_u8: u8 = OpCode::BlockTypeE as u8;
                     match result_u8 {
@@ -275,7 +272,6 @@ impl<'a> Executor<'a> {
                     //FIXME: LEB
                     let result = i8::walk(&mut buf_reader);
                     let label_idx = result.unwrap();
-                    println!("{}", label_idx);
                     res.push(Instruction {
                         op_code: op,
                         params: vec![Param::I32(I32 {
@@ -313,6 +309,9 @@ impl<'a> Executor<'a> {
 
     pub fn init(&mut self) {
         self.parse_instructions(self.module);
+        for i in 0..self.instructions.len(){
+          println!("{} {:#?}", i, self.instructions[i].op_code);
+        }
         // other inititializations
     }
     pub fn new(module: &'a Module) -> Self {
@@ -330,10 +329,12 @@ impl<'a> Executor<'a> {
 }
 
 impl Executor<'_> {
+    pub fn get_result(&mut self) -> StackElement {
+      return self.stack.pop().unwrap();
+    }
     fn get_current_af(&mut self) -> Result<&mut Box<ActivationFrame>, ()> {
         let len = self.af_meta.len();
         let current_af_meta = &mut self.af_meta[len - 1];
-        // println!("{:#?}{}", current_af_meta.position, self.stack.size());
         if let Ok(StackElement::Activation(current_af_boxed)) =
             self.stack.get(current_af_meta.position)
         {
@@ -359,7 +360,8 @@ impl Executor<'_> {
           let top = self.stack.pop().unwrap();
           if let StackElement::Label(l) = top{
             if i == label_idx{
-              self.pc = l.target.1 + 1; // jump to the continuation of the label
+              self.pc = l.continuation; // jump to the continuation of the label
+              // no need to increment one here because we will increment in the main loop
             }
             break;
           }
@@ -370,7 +372,7 @@ impl Executor<'_> {
 }
 
 impl ExecutorTrait for Executor<'_> {
-    fn handle_inst(self: &mut Self, inst: &Instruction) -> Result<ExecutionRes, ExecutionErr> {
+    fn handle_inst(self: &mut Self, inst: &Instruction, terminal: u32) -> Result<ExecutionRes, ExecutionErr> {
         println!("{}:{:#?}", self.pc, inst.op_code);
         match inst.op_code {
             OpCode::I32Const => {
@@ -390,11 +392,15 @@ impl ExecutorTrait for Executor<'_> {
             }
             OpCode::LocalGet => {
                 if let Param::I32(local_idx) = &inst.params[0] {
-                    println!("{}", local_idx.inner);
                     let current_af = self.get_current_af().unwrap();
                     let value = (*current_af).locals[(*local_idx).inner as usize].clone();
-                    println!("{:#?}", value);
-                    self.stack.push((value).into());
+                    let value2 = (*current_af).locals[(*local_idx).inner as usize].clone();
+                    if let Param::I32(v) = value {
+                      if v.inner < -3 {
+                        panic!();
+                      }
+                    }
+                    self.stack.push((value2).into());
                 }
                 return Ok(ExecutionRes {});
             }
@@ -415,6 +421,7 @@ impl ExecutorTrait for Executor<'_> {
               if let StackElement::I32(top1_value) = top1 {
                   if let StackElement::I32(top2_value) = top2 {
                       //FIXME: bitwise disjunction?
+                      // println!("{} {}", (*top1_value).inner, (*top2_value).inner);
                       self.stack.push(StackElement::I32(Box::new(I32 {
                           inner: (*top1_value).inner | (*top2_value).inner,
                       })));
@@ -422,15 +429,18 @@ impl ExecutorTrait for Executor<'_> {
               }
               return Ok(ExecutionRes {});
             }
-            OpCode::I32Eq => {
+            OpCode::I32Eq | OpCode::I32Ne => {
               let top1 = self.stack.pop().unwrap();
               let top2 = self.stack.pop().unwrap();
               if let StackElement::I32(top1_value) = top1 {
                   if let StackElement::I32(top2_value) = top2 {
                       let mut value = 0;
-                      if (*top1_value).inner == (*top2_value).inner {
+                      if (*top1_value).inner == (*top2_value).inner && inst.op_code == OpCode::I32Eq {
                           value = 1;
                       }
+                      if (*top1_value).inner != (*top2_value).inner && inst.op_code == OpCode::I32Ne {
+                        value = 1;
+                    }
                       self.stack
                           .push(StackElement::I32(Box::new(I32 { inner: value })));
                   }
@@ -443,7 +453,6 @@ impl ExecutorTrait for Executor<'_> {
               if let StackElement::I32(top1_value) = top1 {
                   if let StackElement::I32(top2_value) = top2 {
                       let value =  (*top1_value).inner + (*top2_value).inner;
-                      println!("{}", value);
                       self.stack
                           .push(StackElement::I32(Box::new(I32 { inner: value })));
                   }
@@ -456,6 +465,7 @@ impl ExecutorTrait for Executor<'_> {
 
               let label = Label{
                 arity: 0,  //FIXME: real arity
+                continuation: result.end,
                 target: (result.start, result.end),
               };
               self.stack.push(StackElement::Label(Box::new(label)));
@@ -467,7 +477,6 @@ impl ExecutorTrait for Executor<'_> {
                   if let StackElement::I32(value) = self.stack.pop().unwrap(){
                     if (*value).inner != 0{
                       // non-zero, execute the instruction `branch to label`
-
                       // TODO: implement arity
                       self.branch(label_idx.inner as u32);
                     }
@@ -481,13 +490,40 @@ impl ExecutorTrait for Executor<'_> {
               let result = self.block_meta.get(&self.pc).unwrap();
               let label = Label{
                 arity: 0, // FIXME:
-                target: (result.start, result.start), // continuation is the start of the loop
+                continuation: result.start,
+                target: (result.start, result.end), // continuation is the start of the loop
               };
               self.stack.push(StackElement::Label(Box::new(label)));
               return Ok(ExecutionRes {});
             }
             OpCode::End => {
-                // return Err(ExecutionErr::Terminate);
+                // Exiting from a block
+                /*
+                pop all values val from the top of the stack until label L
+                pop label from the stack
+                push all values val back to the stack
+                jump to the end of the structured control instruction associated with label L
+                 */
+                let mut buffer:Vec<StackElement> = vec![];
+                loop {
+                  let top = self.stack.pop().unwrap();
+                  match top {
+                    StackElement::Label(l)=>{
+                        self.pc = l.target.1;
+                      // if self.pc > terminal{
+                      //   // out of the function
+                      //   return Ok(ExecutionRes {  });
+                      // }
+                      break;
+                    }
+                    _ => {
+                      buffer.push(top);
+                    }
+                  }
+                }
+                for _j in 0..buffer.len(){
+                  self.stack.push(buffer.pop().unwrap());
+                }
                 return Ok(ExecutionRes {  });
             }
             _ => {
@@ -504,7 +540,7 @@ impl ExecutorTrait for Executor<'_> {
         //TODO: fix me
         loop {
             let inst = self.instructions[self.pc as usize].clone();
-            let result = self.handle_inst(&inst);
+            let result = self.handle_inst(&inst, terminal);
             match result {
                 Ok(_) => {
                     self.pc += 1;
@@ -525,10 +561,12 @@ impl ExecutorTrait for Executor<'_> {
                     break;
                 }
             }
-            if self.pc == terminal {
+            if self.pc >= terminal {
               break;
             }
         }
+        println!("!!+++++++++++++++Execution End+++++++++++++++++++!!");
+
     }
     fn run_function(self: &mut Self, index: u32) {
         let code = &self.module.codes[index as usize];
@@ -539,6 +577,7 @@ impl ExecutorTrait for Executor<'_> {
         // get the local arguments
         let func_type_index = self.module.functions[index as usize].type_index;
         let func_param_types = &self.module.function_types[func_type_index as usize].0;
+        let func_return_types = &self.module.function_types[func_type_index as usize].1;
         let func_param_count = func_param_types.len();
         // pop from the stack and put into the stack frame
         let mut params: Vec<Param> = vec![];
@@ -553,36 +592,48 @@ impl ExecutorTrait for Executor<'_> {
         };
         let af = ActivationFrame {
             index: self.af_meta.len() as u8,
+            arity: func_return_types.len() as u8,
             locals: get_af_locals(&params, &code.local_var_types),
         };
         self.af_meta.push(af_meta);
         self.stack.push(StackElement::Activation(Box::new(af)));
 
+        // push a label
+        let function_meta = &self.function_meta[index as usize];
+        let label: Label = Label { arity: func_return_types.len() as u8, continuation: caller_pc, target: (function_meta.start, function_meta.end) };
+        self.stack.push(StackElement::Label(Box::new(label)));
+
         self.run(self.function_meta[index as usize].end);
         // function returns,
-        // TODO: arity
+
+        // get arity, i.e. restore the local variables
+        let af = self.get_current_af().unwrap();
+        let arity = (*af).arity;
+        let mut buffer:Vec<StackElement> = vec![];
+        for _j in 0..arity{
+          let top = self.stack.pop().unwrap();
+          buffer.push(top);
+        }
         // pop frame from the stack
-        if let StackElement::Activation(_) = self.stack.pop().unwrap(){
-          
-        } else{
-           panic!("function returns but no activation frame");
+        let top =  self.stack.pop().unwrap();
+        match top{
+          StackElement::Activation(_) => {
+            self.af_meta.pop();
+          }
+          _ => {
+            // print_type_of(&top);
+            println!("{:#?}", top);
+            panic!("function returns but no activation frame");
+          }
+        }
+        for _j in 0..arity{
+          let p = buffer.pop().unwrap();
+          self.stack.push(p);
         }
         self.pc = caller_pc;
-
     }
 }
 
-// fn get_af_references(local_var_types: &Vec<Type>)->Vec<u8>{
-//   let mut ret: Vec<u8> = vec![];
-//   let mut ref_index = 0;
-//   for i in 0..local_var_types.len(){
-//     // println!("{}", local_var_types[i]);
-//     ret.push(ref_index);
-//     let size = get_type_size(&local_var_types[i].try_into().unwrap());
-//     ref_index += size as u8;
-//   }
-//   ret
-// }
 fn get_af_locals(params: &Vec<Param>, local_var_types: &Vec<Type>) -> Vec<Param> {
     let mut ret: Vec<Param> = params.to_vec();
     for i in 0..local_var_types.len() {

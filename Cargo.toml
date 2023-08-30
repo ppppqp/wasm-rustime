@@ -11,4 +11,3 @@ name = "wasm-rustime"
 path = "src/main.rs"
 
 [dependencies]
-enum-iterator = "1.4.1"
