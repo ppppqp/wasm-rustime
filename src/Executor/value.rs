@@ -1,18 +1,51 @@
 use crate::Loader::walker::{Walkable};
 use std::io::{BufReader};
-use crate::Executer::stack::{ActivationFrame, Label};
+use crate::Executor::stack::{ActivationFrame, Label};
+use crate::Loader::consts::Type;
+#[derive(Clone, Debug)]
 pub struct I32{
   pub inner: i32
 }
+#[derive(Clone, Debug)]
 pub struct I64{
   pub inner: i64
 }
+#[derive(Clone, Debug)]
 pub struct F32{
   pub inner: f32
 }
+#[derive(Clone, Debug)]
 pub struct F64{
   pub inner: f64
 }
+#[derive(Clone, Debug)]
+pub struct V128{
+  pub inner: Vec<u8>
+}
+#[derive(Clone, Debug)]
+pub struct RefNull{
+  pub inner: ()
+}
+#[derive(Clone, Debug)]
+pub struct RefFunc{
+  //FIXME: should be unsigned
+  pub inner: i32
+}
+#[derive(Clone, Debug)]
+pub struct RefExtern{
+  pub inner: u8
+}
+
+
+#[derive(Debug)]
+pub enum NativeNumeric{
+  I32(i32),
+  I64(i64),
+  F32(f32),
+  F64(f64)
+}
+
+
 
 #[derive(Debug)]
 pub enum ValueType{
@@ -26,6 +59,21 @@ pub enum ValueType{
   RefExtern = 7,
   Label = 8,
   Activation = 9,
+}
+
+impl TryFrom<Type> for ValueType{
+  type Error = ();
+  fn try_from(v: Type) -> Result<Self, ()>{
+    match v{
+      Type::I32 => Ok(ValueType::I32),
+      Type::I64 => Ok(ValueType::I64),
+      Type::F32 => Ok(ValueType::F32),
+      Type::F64 => Ok(ValueType::F64),
+      Type::FuncRef => Ok(ValueType::RefFunc),
+      Type::ExternRef => Ok(ValueType::RefExtern),
+      _ => Err(())
+    }
+  }
 }
 
 impl From<I32> for Vec<u8>{
@@ -58,30 +106,30 @@ impl TryFrom<Vec<u8>> for I32{
   }
 }
 
-impl TryFrom<ActivationFrame> for Vec<u8>{
-  type Error = ();
-  fn try_from(af: ActivationFrame) -> Result<Vec<u8>, ()>{
-    let mut ret = vec![];
-    ret.push(af.index);
-    ret.append(&mut af.locals.to_vec());
-    return Ok(ret);
-  }
-}
+// impl TryFrom<ActivationFrame> for Vec<u8>{
+//   type Error = ();
+//   fn try_from(af: ActivationFrame) -> Result<Vec<u8>, ()>{
+//     let mut ret = vec![];
+//     ret.push(af.index);
+//     ret.append(&mut af.locals.to_vec());
+//     return Ok(ret);
+//   }
+// }
 
-impl TryFrom<Vec<u8>> for ActivationFrame{
-  type Error = ();
-  fn try_from(v: Vec<u8>) -> Result<ActivationFrame, ()>{
-    let i = 0;
-    if v.len() == 0 {
-      return Err(());
-    }
-    let af = ActivationFrame{
-      index: v[0],
-      locals: v[1..].to_vec()
-    };
-    Ok(af)
-  }
-}
+// impl TryFrom<Vec<u8>> for ActivationFrame{
+//   type Error = ();
+//   fn try_from(v: Vec<u8>) -> Result<ActivationFrame, ()>{
+//     let i = 0;
+//     if v.len() == 0 {
+//       return Err(());
+//     }
+//     let af = ActivationFrame{
+//       index: v[0],
+//       locals: v[1..].to_vec()
+//     };
+//     Ok(af)
+//   }
+// }
 
 impl TryFrom<Label> for Vec<u8>{
   type Error = ();
@@ -104,6 +152,7 @@ impl TryFrom<Vec<u8>> for Label{
 
     let ret = Label{
       arity: v[0],
+      continuation: target2, // FIXME:
       target: (target1, target2)
     };
     Ok(ret)

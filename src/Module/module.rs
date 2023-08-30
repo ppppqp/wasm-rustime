@@ -1,7 +1,7 @@
 use std::fmt;
 use std::fmt::Display;
 use std::fmt::Debug;
-
+use crate::Loader::consts::Type;
 
 #[derive(Debug)]
 pub struct Import{
@@ -12,7 +12,7 @@ pub struct Import{
 
 #[derive(Debug)]
 pub struct Function{
-  pub index: u32
+  pub type_index: u32
 }
 #[derive(Debug)]
 pub struct Export{
@@ -42,7 +42,7 @@ pub struct Global{
 #[derive(Debug)]
 pub struct Code{
   pub body: Vec<u8>,
-  pub local_var_types: Vec<u8>,
+  pub local_var_types: Vec<Type>,
 }
 #[derive(Debug)]
 pub struct Element{

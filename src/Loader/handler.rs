@@ -117,8 +117,8 @@ impl Handler for FunctionHandler{
       let _ = walk::<u32, R>(buf_reader)?;
       let function_count = walk::<u32, R>(buf_reader)?;
       for _i  in 0..function_count{
-        let function_index = walk::<u32, R>(buf_reader)?;
-        module.functions.push(Function{index: function_index});  
+        let type_index = walk::<u32, R>(buf_reader)?;
+        module.functions.push(Function{type_index: type_index});  
       }
       println!("Function section passed");
       Ok(())
@@ -194,11 +194,11 @@ impl Handler for CodeHandler {
         let body_size = walk::<u32, R>(buf_reader)?;
         let local_var_start: u32 = buf_reader.stream_position()? as u32;
         let total_types_num = walk::<u32, R>(buf_reader)?;
-        let mut local_var_types:Vec<u8> = vec![];
+        let mut local_var_types:Vec<Type> = vec![];
         for _j in 0..total_types_num{
           let var_count: u32 = walk::<u32, R>(buf_reader)?;
           let var_type = walk::<u8, R>(buf_reader)?;
-          let mut temp = vec![var_type; var_count as usize];
+          let mut temp:Vec<Type> = vec![var_type.try_into().unwrap(); var_count as usize];
           local_var_types.append(&mut temp);
         }
         let local_var_end: u32 = buf_reader.stream_position()? as u32;

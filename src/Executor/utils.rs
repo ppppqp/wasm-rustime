@@ -1,4 +1,4 @@
-use super::value::ValueType;
+use super::value::*;
 use crate::Loader::walker::{Segable, Walkable};
 use std::io::{BufReader, Read};
 pub fn get_type_size(value_type: &ValueType) -> usize{
@@ -49,18 +49,17 @@ pub fn read_one(data: &Vec<u8>, value_type: &ValueType)->Vec<u8>{
   return ret;
 }
 
-pub fn LEB_to_native(leb: &Vec<u8>, value_type: &ValueType)->Result<Vec<u8>, ()>{
+pub fn LEB_to_native(leb: &Vec<u8>, value_type: &ValueType)->Result<NativeNumeric, ()>{
   let mut buf_reader: BufReader<_> = BufReader::new(leb.as_slice());
   let ret: Vec<u8>;
   match value_type{
     ValueType::I32=>{
       let mut result = i32::walk(&mut buf_reader);
       if result.is_ok(){
-        let result = i32::to_le_bytes(result.unwrap());
-        ret = result.to_vec();
-        return Ok(ret);
+        return Ok(NativeNumeric::I32(result.unwrap()));
       } else{
-        return Err(());
+        panic!("Error LEB to native");
+        // return Err(());
       }
     }
     ValueType::I64=>{
